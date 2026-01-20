@@ -1,0 +1,48 @@
+import { useNavigate } from 'react-router-dom';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faWarehouse, faTruck } from '@fortawesome/free-solid-svg-icons';
+
+export default function LoginSelector() {
+  const navigate = useNavigate();
+
+  return (
+    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
+      <div className="text-center">
+        <div className="mb-10">
+          <h1 className="text-3xl font-bold text-gray-900">With Pride HVAC</h1>
+          <p className="text-gray-600 mt-2">Select your portal to login</p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-6 justify-center">
+          {/* Warehouse Card */}
+          <button
+            onClick={() => navigate('/login')}
+            className="bg-white rounded-lg shadow-lg p-8 w-64 hover:shadow-xl hover:scale-105 transition-all cursor-pointer text-left"
+          >
+            <div className="flex flex-col items-center text-center">
+              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+                <FontAwesomeIcon icon={faWarehouse} className="w-8 h-8 text-blue-600" />
+              </div>
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">Warehouse</h2>
+              <p className="text-gray-600 text-sm">For warehouse managers and staff</p>
+            </div>
+          </button>
+
+          {/* Driver Card */}
+          <button
+            onClick={() => navigate('/driver/login')}
+            className="bg-white rounded-lg shadow-lg p-8 w-64 hover:shadow-xl hover:scale-105 transition-all cursor-pointer text-left"
+          >
+            <div className="flex flex-col items-center text-center">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                <FontAwesomeIcon icon={faTruck} className="w-8 h-8 text-green-600" />
+              </div>
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">Driver</h2>
+              <p className="text-gray-600 text-sm">For delivery drivers</p>
+            </div>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
