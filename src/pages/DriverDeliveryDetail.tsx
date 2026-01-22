@@ -12,6 +12,7 @@ import {
   type DriverDeliveryDetail,
 } from '../services/deliveryConfirm';
 import { supabase } from '../lib/supabase';
+import { sortlyClient } from '../lib/sortly';
 
 export default function DriverDeliveryDetail() {
   const { id } = useParams<{ id: string }>();
@@ -93,6 +94,91 @@ export default function DriverDeliveryDetail() {
       });
 
       const completedAt = new Date().toISOString();
+
+      if (!delivery.truck_sortly_folder_id) {
+        throw new Error('Truck folder is missing for this delivery.');
+      }
+
+      const deliveryNote = `[Delivery: ${delivery.delivery_number}]`;
+      const truckItems: Array<{
+        id: number;
+        name: string;
+        notes?: string | null;
+        quantity?: number | string | null;
+        type?: string;
+      }> = [];
+
+      let page = 1;
+      let hasMore = true;
+      while (hasMore) {
+        const response = await sortlyClient.listItems({
+          parent_id: delivery.truck_sortly_folder_id,
+          per_page: 100,
+          page,
+        });
+        const itemsPage = response.data || [];
+        itemsPage.forEach((item: typeof itemsPage[number]) => {
+          if (item.type === 'item') {
+            truckItems.push(item);
+          }
+        });
+        hasMore = itemsPage.length === 100;
+        page += 1;
+      }
+
+      const taggedTruckItems = truckItems.filter((item) =>
+        (item.notes || '').includes(deliveryNote)
+      );
+
+      let itemsToMove = taggedTruckItems;
+      if (itemsToMove.length === 0 && items.length > 0) {
+        const fallbackItems: typeof taggedTruckItems = [];
+        for (const deliveryItem of items) {
+          if (!deliveryItem.item_name) continue;
+          const itemInTruck = await sortlyClient.findItemInFolder(
+            deliveryItem.sortly_item_id || 0,
+            deliveryItem.item_name,
+            delivery.truck_sortly_folder_id
+          );
+          if (itemInTruck) {
+            fallbackItems.push(itemInTruck);
+          }
+        }
+        itemsToMove = fallbackItems;
+      }
+
+      if (delivery.project_id == null) {
+        for (const item of itemsToMove) {
+          await sortlyClient.deleteItem(item.id);
+        }
+      } else {
+        const toCompany = delivery.to_address.company_name
+          ?.trim()
+          .toLowerCase();
+        const isToWithPride = toCompany === 'with pride hvac';
+        const targetFolderId = isToWithPride
+          ? delivery.projects?.sortly_warehouse_folder_id
+          : delivery.projects?.sortly_jobsite_folder_id;
+
+        if (!targetFolderId) {
+          throw new Error(
+            isToWithPride
+              ? 'Project warehouse folder is missing in Sortly.'
+              : 'Project job site folder is missing in Sortly.'
+          );
+        }
+
+        for (const item of itemsToMove) {
+          const quantityToMove = Number(item.quantity) || 0;
+          if (quantityToMove <= 0) continue;
+          await sortlyClient.moveItemWithOptions(
+            item.id,
+            quantityToMove,
+            targetFolderId,
+            false
+          );
+        }
+      }
 
       const { error: insertError, data: confirmationData } = await supabase
         .from('delivery_confirmations')

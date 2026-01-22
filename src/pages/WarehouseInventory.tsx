@@ -2,6 +2,10 @@ import { useState, useEffect, useRef } from "react";
 import { sortlyClient } from "../lib/sortly";
 import type { SortlyItem } from "../types/sortly";
 import { getBrand, getPartNumber } from "../utils/sortlyHelpers";
+import { deleteItem, updateItem } from "../services/sortlyApi";
+import { inventoryCache } from "../services/inventoryCache";
+import ItemFormModal from "../components/ItemFormModal";
+import DeleteConfirmDialog from "../components/DeleteConfirmDialog";
 
 export default function WarehouseInventory() {
   const [items, setItems] = useState<SortlyItem[]>([]);
@@ -12,75 +16,120 @@ export default function WarehouseInventory() {
   const [breadcrumbs, setBreadcrumbs] = useState<
     Array<{ id: number | null; name: string }>
   >([{ id: null, name: "Root" }]);
-  const lastUpdated = useRef<Date>(new Date());
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [cacheExpiry, setCacheExpiry] = useState<number>(0);
 
-  // Store all items once
-  const allItems = useRef<SortlyItem[]>([]);
-  const hasFetchedAll = useRef(false);
+  // CRUD state
+  const [showItemForm, setShowItemForm] = useState(false);
+  const [editingItem, setEditingItem] = useState<SortlyItem | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<SortlyItem | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionError, setActionError] = useState("");
+  const [actionSuccess, setActionSuccess] = useState("");
+
+  // Auto-refresh state - only refresh when cache expires
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const refreshTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    if (!hasFetchedAll.current) {
-      fetchAllItems();
-    } else {
-      filterItemsByFolder(currentFolderId);
-    }
+    loadFolderItems();
   }, [currentFolderId]);
 
-  const fetchAllItems = async () => {
+  // Auto-refresh effect - only refresh when cache expires
+  useEffect(() => {
+    if (autoRefresh && cacheExpiry > 0) {
+      // Set timer to refresh when cache expires
+      const timeout = setTimeout(() => {
+        console.log('Cache expired, auto-refreshing...');
+        loadFolderItems(true);
+      }, cacheExpiry * 1000);
+
+      return () => clearTimeout(timeout);
+    }
+  }, [autoRefresh, cacheExpiry]);
+
+  // Update cache expiry counter every second
+  useEffect(() => {
+    if (cacheExpiry > 0) {
+      const interval = setInterval(() => {
+        const remaining = inventoryCache.getTimeUntilExpiry(currentFolderId);
+        setCacheExpiry(remaining);
+        if (remaining === 0 && autoRefresh) {
+          loadFolderItems(true);
+        }
+      }, 1000);
+
+      return () => clearInterval(interval);
+    }
+  }, [cacheExpiry, currentFolderId, autoRefresh]);
+
+  const loadFolderItems = async (forceRefresh: boolean = false) => {
     setLoading(true);
-    setInitialLoading(true);
+    if (!inventoryCache.isValid(currentFolderId)) {
+      setInitialLoading(true);
+    }
     setError("");
 
     try {
-      const allFetchedItems: SortlyItem[] = [];
+      // Check cache first
+      if (!forceRefresh) {
+        const cached = inventoryCache.get(currentFolderId);
+        if (cached) {
+          console.log(`✓ Using cached data for folder ${currentFolderId}`);
+          setItems(cached);
+          setLastUpdated(inventoryCache.getTimestamp(currentFolderId) || new Date());
+          setCacheExpiry(inventoryCache.getTimeUntilExpiry(currentFolderId));
+          setLoading(false);
+          setInitialLoading(false);
+          return;
+        }
+      }
+
+      // Fetch from API if cache miss or force refresh
+      console.log(`Fetching items from API for folder ${currentFolderId}...`);
+      const fetchedItems: SortlyItem[] = [];
       let page = 1;
       let hasMore = true;
 
       while (hasMore) {
-        const response = await sortlyClient.listItems({ per_page: 100, page });
+        const response = await sortlyClient.listItems({
+          parent_id: currentFolderId === null ? undefined : currentFolderId,
+          per_page: 100,
+          page
+        });
 
         if (response.data && response.data.length > 0) {
-          allFetchedItems.push(...response.data);
+          fetchedItems.push(...response.data);
           hasMore = response.data.length === 100;
           page++;
-          console.log(
-            `Fetched page ${page - 1}: ${
-              allFetchedItems.length
-            } total items so far...`
-          );
         } else {
           hasMore = false;
         }
       }
 
-      console.log(`✓ Loaded all ${allFetchedItems.length} items into memory`);
-      allItems.current = allFetchedItems;
-      hasFetchedAll.current = true;
-      lastUpdated.current = new Date(); // Add this line
+      // Filter to only items in this folder
+      const folderItems = fetchedItems.filter((item) => {
+        if (currentFolderId === null) {
+          return item.parent_id === null || item.parent_id === undefined;
+        } else {
+          return item.parent_id === currentFolderId;
+        }
+      });
 
-      // Now filter for current folder
-      filterItemsByFolder(currentFolderId);
+      console.log(`✓ Loaded ${folderItems.length} items for folder ${currentFolderId}`);
+
+      // Update cache
+      inventoryCache.set(currentFolderId, folderItems);
+      setItems(folderItems);
+      setLastUpdated(new Date());
+      setCacheExpiry(inventoryCache.getTimeUntilExpiry(currentFolderId));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch items");
     } finally {
       setLoading(false);
       setInitialLoading(false);
     }
-  };
-
-  const filterItemsByFolder = (folderId: number | null) => {
-    console.log(`Filtering items for folder ${folderId}...`);
-
-    const filteredItems = allItems.current.filter((item) => {
-      if (folderId === null) {
-        return item.parent_id === null || item.parent_id === undefined;
-      } else {
-        return item.parent_id === folderId;
-      }
-    });
-
-    console.log(`Found ${filteredItems.length} items in folder ${folderId}`);
-    setItems(filteredItems);
   };
 
   const navigateToFolder = (folderId: number, folderName: string) => {
@@ -92,6 +141,115 @@ export default function WarehouseInventory() {
     const newBreadcrumbs = breadcrumbs.slice(0, index + 1);
     setBreadcrumbs(newBreadcrumbs);
     setCurrentFolderId(newBreadcrumbs[newBreadcrumbs.length - 1].id);
+  };
+
+  // CRUD handlers
+  const handleItemClick = (item: SortlyItem) => {
+    setEditingItem(item);
+    setShowItemForm(true);
+  };
+
+  const handleDeleteFromModal = () => {
+    if (editingItem) {
+      setShowItemForm(false);
+      setItemToDelete(editingItem);
+      setShowDeleteDialog(true);
+    }
+  };
+
+  const handleSaveItem = async (itemData: Partial<SortlyItem>) => {
+    setActionLoading(true);
+    setActionError("");
+    setActionSuccess("");
+
+    try {
+      if (editingItem) {
+        // Update on server
+        const updatedItem = await updateItem(editingItem.id, itemData);
+        setActionSuccess(`Updated "${itemData.name || editingItem.name}"`);
+
+        // Update cache immediately
+        inventoryCache.updateItem(editingItem.id, updatedItem);
+
+        // Refresh local state from cache
+        const cached = inventoryCache.get(currentFolderId);
+        if (cached) {
+          setItems(cached);
+        }
+      } else {
+        // Create new item
+        const newItem = await sortlyClient.createItem({
+          name: itemData.name!,
+          quantity: itemData.quantity || 0,
+          parent_id: currentFolderId!,
+        });
+
+        // Add other fields via updateItem if needed
+        let finalItem = newItem.data;
+        const updateData: Partial<SortlyItem> = {};
+        if (itemData.sid) updateData.sid = itemData.sid;
+        if (itemData.price) updateData.price = itemData.price;
+        if (itemData.notes) updateData.notes = itemData.notes;
+        if (itemData.tags) updateData.tags = itemData.tags;
+
+        if (Object.keys(updateData).length > 0) {
+          finalItem = await updateItem(newItem.data.id, updateData);
+        }
+
+        setActionSuccess(`Created "${itemData.name}"`);
+
+        // Add to cache immediately
+        inventoryCache.addItem(currentFolderId, finalItem);
+
+        // Refresh local state from cache
+        const cached = inventoryCache.get(currentFolderId);
+        if (cached) {
+          setItems(cached);
+        }
+      }
+
+      // Close modal
+      setShowItemForm(false);
+      setEditingItem(null);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Failed to save item");
+      // Refresh from API on error to ensure consistency
+      await loadFolderItems(true);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!itemToDelete) return;
+
+    setActionLoading(true);
+    setActionError("");
+
+    try {
+      // Delete on server
+      await deleteItem(itemToDelete.id);
+      setActionSuccess(`Deleted "${itemToDelete.name}"`);
+
+      // Remove from cache immediately
+      inventoryCache.removeItem(itemToDelete.id);
+
+      // Refresh local state from cache
+      const cached = inventoryCache.get(currentFolderId);
+      if (cached) {
+        setItems(cached);
+      }
+
+      // Close dialog
+      setShowDeleteDialog(false);
+      setItemToDelete(null);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Failed to delete item");
+      // Refresh from API on error to ensure consistency
+      await loadFolderItems(true);
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   const folders = items.filter((item) => item.type === "folder");
@@ -111,21 +269,43 @@ export default function WarehouseInventory() {
               <h1 className="text-2xl font-bold text-gray-900">
                 Warehouse Inventory
               </h1>
-              {hasFetchedAll.current && (
-                <p className="text-xs text-gray-500 mt-1">
-                  Last updated: {new Date().toLocaleTimeString()}
-                </p>
+              {!initialLoading && (
+                <div className="flex items-center gap-3 mt-1">
+                  <p className="text-xs text-gray-500">
+                    Last updated: {lastUpdated.toLocaleTimeString()}
+                  </p>
+                  {cacheExpiry > 0 && (
+                    <p className="text-xs text-gray-500">
+                      • Cache expires in: {Math.floor(cacheExpiry / 60)}m {cacheExpiry % 60}s
+                    </p>
+                  )}
+                  <label className="flex items-center gap-2 text-xs text-gray-600">
+                    <input
+                      type="checkbox"
+                      checked={autoRefresh}
+                      onChange={(e) => setAutoRefresh(e.target.checked)}
+                      className="rounded"
+                    />
+                    Auto-refresh when cache expires
+                  </label>
+                </div>
               )}
             </div>
             <div className="flex items-center gap-3">
-              {hasFetchedAll.current && (
+              {currentFolderId !== null && !initialLoading && (
                 <button
                   onClick={() => {
-                    hasFetchedAll.current = false;
-                    setCurrentFolderId(null);
-                    setBreadcrumbs([{ id: null, name: "Root" }]);
-                    fetchAllItems();
+                    setEditingItem(null);
+                    setShowItemForm(true);
                   }}
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700"
+                >
+                  + Add Item
+                </button>
+              )}
+              {!initialLoading && (
+                <button
+                  onClick={() => loadFolderItems(true)}
                   disabled={loading}
                   className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
@@ -165,6 +345,30 @@ export default function WarehouseInventory() {
             ))}
           </ol>
         </nav>
+
+        {actionSuccess && (
+          <div className="mb-4 bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg flex justify-between items-center">
+            <span>{actionSuccess}</span>
+            <button
+              onClick={() => setActionSuccess("")}
+              className="text-green-600 hover:text-green-800 font-bold text-xl"
+            >
+              ×
+            </button>
+          </div>
+        )}
+
+        {actionError && (
+          <div className="mb-4 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg flex justify-between items-center">
+            <span>{actionError}</span>
+            <button
+              onClick={() => setActionError("")}
+              className="text-red-600 hover:text-red-800 font-bold text-xl"
+            >
+              ×
+            </button>
+          </div>
+        )}
 
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg mb-6">
@@ -253,13 +457,20 @@ export default function WarehouseInventory() {
                         Barcode
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Date Received
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Notes
                       </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {items.map((item) => (
-                      <tr key={item.id} className="hover:bg-gray-50">
+                      <tr
+                        key={item.id}
+                        onClick={() => handleItemClick(item)}
+                        className="hover:bg-blue-50 cursor-pointer transition-colors"
+                      >
                         <td className="px-6 py-4 whitespace-nowrap">
                           {item.photos && item.photos.length > 0 ? (
                             <img
@@ -300,9 +511,30 @@ export default function WarehouseInventory() {
                             {item.sid || "-"}
                           </div>
                         </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {(() => {
+                            // Try to extract Date Received from notes metadata
+                            if (item.notes) {
+                              const dateMatch = item.notes.match(/Date Received: ([^|\]]+)/);
+                              if (dateMatch) return dateMatch[1].trim();
+                            }
+                            // Fallback to custom attributes if available
+                            const dateAttr = item.custom_attribute_values?.find(
+                              (attr) => attr.custom_attribute_name === "Date Received"
+                            );
+                            return dateAttr?.value || <span className="text-gray-400">—</span>;
+                          })()}
+                        </td>
                         <td className="px-6 py-4">
                           <div className="text-sm text-gray-500 max-w-xs truncate">
-                            {item.notes || "-"}
+                            {(() => {
+                              // Remove metadata from notes display
+                              if (item.notes) {
+                                const notesWithoutMetadata = item.notes.replace(/^\[.*?\]\n?/, '');
+                                return notesWithoutMetadata || "-";
+                              }
+                              return "-";
+                            })()}
                           </div>
                         </td>
                       </tr>
@@ -322,6 +554,31 @@ export default function WarehouseInventory() {
           </>
         )}
       </main>
+
+      {/* Item Form Modal */}
+      <ItemFormModal
+        isOpen={showItemForm}
+        onClose={() => {
+          setShowItemForm(false);
+          setEditingItem(null);
+        }}
+        onSave={handleSaveItem}
+        onDelete={editingItem ? handleDeleteFromModal : undefined}
+        editItem={editingItem}
+        parentFolderId={currentFolderId}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <DeleteConfirmDialog
+        isOpen={showDeleteDialog}
+        onClose={() => {
+          setShowDeleteDialog(false);
+          setItemToDelete(null);
+        }}
+        onConfirm={handleConfirmDelete}
+        item={itemToDelete}
+        loading={actionLoading}
+      />
     </div>
   );
 }

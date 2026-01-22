@@ -80,6 +80,30 @@ export const sortlyClient = {
     return response.json();
   },
 
+  async deleteItem(itemId: number) {
+    const response = await fetch(`${SORTLY_API_BASE}/items/${itemId}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${import.meta.env.VITE_SORTLY_SECRET_KEY}`,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `Sortly API error: ${response.statusText} - ${errorText}`
+      );
+    }
+
+    if (response.status === 204) {
+      return { success: true };
+    }
+
+    return response.json();
+  },
+
   /**
    * Copy item to destination folder (keep original in source)
    * Use for: Warehouse → Truck (items stay in warehouse)
@@ -190,6 +214,31 @@ export const sortlyClient = {
     }
 
     // Sortly PUT returns 204 No Content on success
+    if (response.status === 204) {
+      return { success: true };
+    }
+
+    return response.json();
+  },
+
+  async deleteItem(itemId: number) {
+    const response = await fetch(`${SORTLY_API_BASE}/items/${itemId}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${import.meta.env.VITE_SORTLY_SECRET_KEY}`,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `Sortly API error: ${response.statusText} - ${errorText}`
+      );
+    }
+
+    // DELETE typically returns 204 No Content on success
     if (response.status === 204) {
       return { success: true };
     }

@@ -504,27 +504,13 @@ export default function CreateDelivery() {
       const manualItems = deliveryItems.filter(
         (item) => item.sortly_item_id === null
       );
-      const toCompany = toAddress.company_name.trim().toLowerCase();
-      const isToWithPride = toCompany === "with pride hvac";
 
-      if (manualItems.length > 0 && selectedProject) {
-        const targetFolderId = isToWithPride
-          ? selectedProject.sortly_warehouse_folder_id
-          : selectedProject.sortly_jobsite_folder_id;
-
-        if (!targetFolderId) {
-          throw new Error(
-            isToWithPride
-              ? "Selected project does not have a warehouse folder in Sortly"
-              : "Selected project does not have a job site folder in Sortly"
-          );
-        }
-
+      if (manualItems.length > 0) {
         for (const item of manualItems) {
           const created = await sortlyClient.createItem({
             name: item.item_name,
             quantity: item.quantity,
-            parent_id: targetFolderId,
+            parent_id: truckFolderId,
           });
           const createdItem = created?.data ?? created;
 
@@ -536,7 +522,7 @@ export default function CreateDelivery() {
 
           await sortlyClient.addDeliveryNote(
             createdItem.id,
-            targetFolderId,
+            truckFolderId,
             deliveryNumber
           );
         }

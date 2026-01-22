@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faChevronLeft, faWarehouse } from '@fortawesome/free-solid-svg-icons';
 import { useAuth } from '../contexts/AuthContext';
+import warehouseBackground from '../assets/Expansive Warehouse Interior.png';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -28,8 +29,16 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full">
+    <div
+      className="min-h-screen flex items-center justify-center p-4 bg-cover bg-center bg-no-repeat relative"
+      style={{ backgroundImage: `url(${warehouseBackground})` }}
+    >
+      {/* Dark overlay for better contrast */}
+      <div className="absolute inset-0 bg-black/40" />
+
+      {/* Content wrapper */}
+      <div className="relative z-10 w-full max-w-md">
+        <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-2xl p-8">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900">With Pride HVAC</h1>
           <p className="text-gray-600 mt-2">Delivery Management System</p>
@@ -99,6 +108,7 @@ export default function Login() {
             <FontAwesomeIcon icon={faChevronLeft} className="w-3 h-3" />
             Back to portal selection
           </Link>
+        </div>
         </div>
       </div>
     </div>

@@ -5,6 +5,7 @@ export interface DriverDeliverySummary {
   id: number;
   delivery_number: string;
   driver_id?: string | null;
+  project_id?: number | null;
   status: string;
   created_at: string;
   delivered_at: string | null;
@@ -12,7 +13,11 @@ export interface DriverDeliverySummary {
   to_address: Address;
   truck_sortly_folder_id?: number | null;
   truck_name: string | null;
-  projects?: { name: string } | null;
+  projects?: {
+    name: string;
+    sortly_jobsite_folder_id?: number | null;
+    sortly_warehouse_folder_id?: number | null;
+  } | null;
 }
 
 export interface DriverDeliveryDetail extends DriverDeliverySummary {
@@ -59,6 +64,7 @@ export async function fetchDriverDeliveriesByFolder(truckFolderId: number) {
       id,
       delivery_number,
       driver_id,
+      project_id,
       status,
       created_at,
       delivered_at,
@@ -87,6 +93,7 @@ export async function fetchDriverDeliveryDetail(deliveryId: number) {
       id,
       delivery_number,
       driver_id,
+      project_id,
       status,
       created_at,
       delivered_at,
@@ -96,7 +103,9 @@ export async function fetchDriverDeliveryDetail(deliveryId: number) {
       truck_name,
       activity_log,
       projects (
-        name
+        name,
+        sortly_jobsite_folder_id,
+        sortly_warehouse_folder_id
       )
     `
     )

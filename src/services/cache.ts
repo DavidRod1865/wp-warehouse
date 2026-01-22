@@ -110,6 +110,40 @@ class CacheService {
       keys: Array.from(this.cache.keys()),
     };
   }
+
+  /**
+   * Check if cache exists and is still valid
+   */
+  isValid(url: string, params?: Record<string, unknown>): boolean {
+    const key = this.generateKey(url, params);
+    const entry = this.cache.get(key);
+
+    if (!entry) {
+      return false;
+    }
+
+    const now = Date.now();
+    const age = now - entry.timestamp;
+    return age <= entry.ttl;
+  }
+
+  /**
+   * Get time until cache expires (in seconds)
+   */
+  getTimeUntilExpiry(url: string, params?: Record<string, unknown>): number | null {
+    const key = this.generateKey(url, params);
+    const entry = this.cache.get(key);
+
+    if (!entry) {
+      return null;
+    }
+
+    const now = Date.now();
+    const age = now - entry.timestamp;
+    const remaining = entry.ttl - age;
+
+    return remaining > 0 ? Math.ceil(remaining / 1000) : 0;
+  }
 }
 
 // Export singleton instance

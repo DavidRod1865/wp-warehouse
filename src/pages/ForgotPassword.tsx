@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faChevronLeft } from '@fortawesome/free-solid-svg-icons';
 import { useAuth } from '../contexts/AuthContext';
+import warehouseBackground from '../assets/Expansive Warehouse Interior.png';
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
@@ -29,14 +30,22 @@ export default function ForgotPassword() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Reset Password</h1>
-          <p className="text-gray-600 mt-2">Enter your email to receive a reset link</p>
-        </div>
+    <div
+      className="min-h-screen flex items-center justify-center p-4 bg-cover bg-center bg-no-repeat relative"
+      style={{ backgroundImage: `url(${warehouseBackground})` }}
+    >
+      {/* Dark overlay for better contrast */}
+      <div className="absolute inset-0 bg-black/40" />
 
-        {success ? (
+      {/* Content wrapper */}
+      <div className="relative z-10 w-full max-w-md">
+        <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-2xl p-8">
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold text-gray-900">Reset Password</h1>
+            <p className="text-gray-600 mt-2">Enter your email to receive a reset link</p>
+          </div>
+
+          {success ? (
           <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg text-sm mb-6">
             Password reset email sent! Check your inbox for the reset link.
           </div>
@@ -71,16 +80,17 @@ export default function ForgotPassword() {
               {loading ? 'Sending...' : 'Send Reset Link'}
             </button>
           </form>
-        )}
+          )}
 
-        <div className="mt-6 text-center">
-          <Link
-            to="/login"
-            className="text-gray-600 hover:text-gray-900 text-sm flex items-center justify-center gap-1"
-          >
-            <FontAwesomeIcon icon={faChevronLeft} className="w-3 h-3" />
-            Back to login
-          </Link>
+          <div className="mt-6 text-center">
+            <Link
+              to="/login"
+              className="text-gray-600 hover:text-gray-900 text-sm flex items-center justify-center gap-1"
+            >
+              <FontAwesomeIcon icon={faChevronLeft} className="w-3 h-3" />
+              Back to login
+            </Link>
+          </div>
         </div>
       </div>
     </div>

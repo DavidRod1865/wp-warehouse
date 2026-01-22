@@ -640,6 +640,44 @@ export async function updateItem(itemId: number, updates: Partial<SortlyItem>): 
 }
 
 /**
+ * Delete an item from Sortly API
+ * @param itemId Item ID to delete
+ */
+export async function deleteItem(itemId: number): Promise<void> {
+  try {
+    const secretKey = getSecretKey().trim();
+    const authHeader = `Bearer ${secretKey}`;
+
+    const url = `${API_BASE_URL}/items/${itemId}`;
+    const requestHeaders = {
+      'Authorization': authHeader,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    };
+
+    const response = await fetch(url, {
+      method: 'DELETE',
+      headers: requestHeaders,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `Sortly API error: ${response.status} ${response.statusText}. ${errorText}`
+      );
+    }
+
+    // Invalidate cache after delete
+    invalidateCache();
+  } catch (error) {
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error('Failed to delete item from Sortly API');
+  }
+}
+
+/**
  * Search folders by name
  * @param query Search query string (empty string returns all folders)
  */
