@@ -117,7 +117,9 @@ export default function ItemFormModal({
         name: name.trim(),
         quantity,
         ...(sku && { sid: sku }),
-        ...(tags && { tags: tags.split(',').map(t => t.trim()).filter(Boolean) }),
+        ...(tags && {
+          tag_names: tags.split(',').map(t => t.trim()).filter(Boolean),
+        }),
       };
 
       // Custom attributes are stored in notes for now since they require setup in Sortly account

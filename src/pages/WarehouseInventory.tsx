@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { sortlyClient } from "../lib/sortly";
 import type { SortlyItem } from "../types/sortly";
 import { getBrand, getPartNumber } from "../utils/sortlyHelpers";
@@ -30,7 +30,6 @@ export default function WarehouseInventory() {
 
   // Auto-refresh state - only refresh when cache expires
   const [autoRefresh, setAutoRefresh] = useState(true);
-  const refreshTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     loadFolderItems();

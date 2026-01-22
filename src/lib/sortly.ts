@@ -221,31 +221,6 @@ export const sortlyClient = {
     return response.json();
   },
 
-  async deleteItem(itemId: number) {
-    const response = await fetch(`${SORTLY_API_BASE}/items/${itemId}`, {
-      method: "DELETE",
-      headers: {
-        Authorization: `Bearer ${import.meta.env.VITE_SORTLY_SECRET_KEY}`,
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(
-        `Sortly API error: ${response.statusText} - ${errorText}`
-      );
-    }
-
-    // DELETE typically returns 204 No Content on success
-    if (response.status === 204) {
-      return { success: true };
-    }
-
-    return response.json();
-  },
-
   async findItemInFolder(
     _originalItemId: number,
     itemName: string,
