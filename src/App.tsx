@@ -15,8 +15,9 @@ import DeliveryDetail from './pages/DeliveryDetail';
 import EditDelivery from './pages/EditDelivery';
 import ActivityLog from './pages/ActivityLog';
 import Vendors from './pages/Vendors';
+import DashboardLayout from './components/DashboardLayout';
 
-function ManagerRoute({ children }: { children: React.ReactNode }) {
+function ManagerLayoutRoute() {
   const { user, profile, loading } = useAuth();
 
   if (loading) {
@@ -30,13 +31,13 @@ function ManagerRoute({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!user) return <Navigate to="/login" />;
+  if (!user) return <LoginSelector />;
 
   if (profile?.role === 'driver') {
     return <Navigate to="/driver/deliveries" />;
   }
 
-  return <>{children}</>;
+  return <DashboardLayout />;
 }
 
 function DriverRoute({ children }: { children: React.ReactNode }) {
@@ -104,30 +105,20 @@ function AppRoutes() {
       />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
-      <Route
-        path="/"
-        element={
-          user ? (
-            profile?.role === 'driver' ? (
-              <Navigate to="/driver/deliveries" />
-            ) : (
-              <Dashboard />
-            )
-          ) : (
-            <LoginSelector />
-          )
-        }
-      />
-      <Route path="/inventory" element={<ManagerRoute><WarehouseInventory /></ManagerRoute>} />
-      <Route path="*" element={<Navigate to="/" />} />
-      <Route path="/deliveries/create" element={<ManagerRoute><CreateDelivery /></ManagerRoute>} />
-      <Route path="/deliveries/:id" element={<ManagerRoute><DeliveryDetail /></ManagerRoute>} />
-      <Route path="/deliveries/:id/edit" element={<ManagerRoute><EditDelivery /></ManagerRoute>} />
-      <Route path="/activity-log" element={<ManagerRoute><ActivityLog /></ManagerRoute>} />
-      <Route path="/vendors" element={<ManagerRoute><Vendors /></ManagerRoute>} />
-      <Route path="/drivers" element={<ManagerRoute><DriverManagement /></ManagerRoute>} />
+      <Route path="/" element={<ManagerLayoutRoute />}>
+        <Route index element={<Dashboard />} />
+        <Route path="deliveries" element={<Dashboard />} />
+        <Route path="inventory" element={<WarehouseInventory />} />
+        <Route path="deliveries/create" element={<CreateDelivery />} />
+        <Route path="deliveries/:id" element={<DeliveryDetail />} />
+        <Route path="deliveries/:id/edit" element={<EditDelivery />} />
+        <Route path="activity-log" element={<ActivityLog />} />
+        <Route path="vendors" element={<Vendors />} />
+        <Route path="drivers" element={<DriverManagement />} />
+      </Route>
       <Route path="/driver/deliveries" element={<DriverRoute><DriverDeliveries /></DriverRoute>} />
       <Route path="/driver/deliveries/:id" element={<DriverRoute><DriverDeliveryDetail /></DriverRoute>} />
+      <Route path="*" element={<Navigate to="/" />} />
     </Routes>
   );
 }

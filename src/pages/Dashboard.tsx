@@ -1,5 +1,6 @@
 import { useState, useEffect, Fragment } from "react";
 import { useNavigate } from "react-router-dom";
+import warehouseLogo from "../assets/WP-warehouse-logo.png";
 import { useAuth } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
 import { fetchAllFolders } from "../services/sortlyApi";
@@ -228,15 +229,22 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-full">
       {/* Header */}
       <header className="bg-white shadow">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">
-              With Pride HVAC
-            </h1>
-            <p className="text-sm text-gray-600">Delivery Management</p>
+          <div className="flex items-center gap-3">
+            <img
+              src={warehouseLogo}
+              alt="WP Warehouse"
+              className="h-12 w-auto object-contain"
+            />
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">
+                With Pride HVAC
+              </h1>
+              <p className="text-sm text-gray-600">Warehouse Delivery</p>
+            </div>
           </div>
           <div className="flex items-center gap-4">
             <div className="text-right">
@@ -259,91 +267,6 @@ export default function Dashboard() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-        {/* Quick Actions */}
-        <div>
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">
-            Quick Actions
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            {/* Warehouse Inventory Card */}
-            <button
-              onClick={() => navigate("/inventory")}
-              className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow text-left"
-            >
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Warehouse Inventory
-                </h3>
-                <span className="text-2xl">📦</span>
-              </div>
-              <p className="text-gray-600 text-sm">
-                View and manage warehouse stock
-              </p>
-            </button>
-
-            {/* Create Delivery Card */}
-            <button
-              onClick={() => navigate("/deliveries/create")}
-              className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow text-left"
-            >
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Create Delivery
-                </h3>
-                <span className="text-2xl">🚚</span>
-              </div>
-              <p className="text-gray-600 text-sm">
-                Create new delivery ticket
-              </p>
-            </button>
-
-            {/* Activity Log Card */}
-            <button
-              onClick={() => navigate("/activity-log")}
-              className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow text-left"
-            >
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Activity Log
-                </h3>
-                <span className="text-2xl">📋</span>
-              </div>
-              <p className="text-gray-600 text-sm">View all system activity</p>
-            </button>
-
-            {/* Vendors Card */}
-            <button
-              onClick={() => navigate("/vendors")}
-              className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow text-left"
-            >
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">Vendors</h3>
-                <span className="text-2xl">🏢</span>
-              </div>
-              <p className="text-gray-600 text-sm">
-                Manage vendor addresses and contacts
-              </p>
-            </button>
-
-            {/* Driver Management Card */}
-            <button
-              onClick={() => navigate("/drivers")}
-              className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow text-left"
-            >
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Driver Management
-                </h3>
-                <span className="text-2xl">👤</span>
-              </div>
-              <p className="text-gray-600 text-sm">
-                Link drivers to truck folders
-              </p>
-            </button>
-
-          </div>
-        </div>
-
         {/* Deliveries Section */}
         <div>
           <div className="flex items-center justify-between mb-4">
