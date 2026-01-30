@@ -390,39 +390,43 @@ export default function WarehouseInventory() {
             {/* Folders Table */}
             {showFolders && (
               <div className="bg-white rounded-lg shadow overflow-hidden">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Folder Name
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Type
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {folders.map((folder) => (
-                      <tr
-                        key={folder.id}
-                        onClick={() => navigateToFolder(folder.id, folder.name)}
-                        className="hover:bg-blue-50 cursor-pointer transition-colors"
-                      >
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <span className="text-xl mr-3">📁</span>
-                            <span className="text-sm font-medium text-gray-900">
-                              {folder.name}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="text-sm text-gray-500">Folder</span>
-                        </td>
+                <div className="overflow-x-auto">
+                  <table className="min-w-[400px] divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Folder Name
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Type
+                        </th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {folders.map((folder) => (
+                        <tr
+                          key={folder.id}
+                          onClick={() =>
+                            navigateToFolder(folder.id, folder.name)
+                          }
+                          className="hover:bg-blue-50 cursor-pointer transition-colors"
+                        >
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center">
+                              <span className="text-xl mr-3">📁</span>
+                              <span className="text-sm font-medium text-gray-900">
+                                {folder.name}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className="text-sm text-gray-500">Folder</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
 
@@ -434,112 +438,122 @@ export default function WarehouseInventory() {
                     Items ({inventoryItems.length})
                   </h2>
                 </div>
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Photo
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Item Name
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Brand
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Part Number
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Quantity
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Barcode
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Date Received
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Notes
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {items.map((item) => (
-                      <tr
-                        key={item.id}
-                        onClick={() => handleItemClick(item)}
-                        className="hover:bg-blue-50 cursor-pointer transition-colors"
-                      >
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          {item.photos && item.photos.length > 0 ? (
-                            <img
-                              src={item.photos[0].url}
-                              alt={item.name}
-                              className="h-12 w-12 object-cover rounded"
-                            />
-                          ) : (
-                            <div className="h-12 w-12 bg-gray-200 rounded flex items-center justify-center">
-                              <span className="text-gray-400 text-xs">
-                                No photo
-                              </span>
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="text-sm font-medium text-gray-900">
-                            {item.name}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">
-                            {getBrand(item) || "-"}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">
-                            {getPartNumber(item) || "-"}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">
-                            {item.quantity || 0}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-500">
-                            {item.sid || "-"}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {(() => {
-                            // Try to extract Date Received from notes metadata
-                            if (item.notes) {
-                              const dateMatch = item.notes.match(/Date Received: ([^|\]]+)/);
-                              if (dateMatch) return dateMatch[1].trim();
-                            }
-                            // Fallback to custom attributes if available
-                            const dateAttr = item.custom_attribute_values?.find(
-                              (attr) => attr.custom_attribute_name === "Date Received"
-                            );
-                            return dateAttr?.value || <span className="text-gray-400">—</span>;
-                          })()}
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="text-sm text-gray-500 max-w-xs truncate">
-                            {(() => {
-                              // Remove metadata from notes display
-                              if (item.notes) {
-                                const notesWithoutMetadata = item.notes.replace(/^\[.*?\]\n?/, '');
-                                return notesWithoutMetadata || "-";
-                              }
-                              return "-";
-                            })()}
-                          </div>
-                        </td>
+                <div className="overflow-x-auto">
+                  <table className="min-w-[1000px] divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Photo
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Item Name
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Brand
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Part Number
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Quantity
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Barcode
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Date Received
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Notes
+                        </th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {items.map((item) => (
+                        <tr
+                          key={item.id}
+                          onClick={() => handleItemClick(item)}
+                          className="hover:bg-blue-50 cursor-pointer transition-colors"
+                        >
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {item.photos && item.photos.length > 0 ? (
+                              <img
+                                src={item.photos[0].url}
+                                alt={item.name}
+                                className="h-12 w-12 object-cover rounded"
+                              />
+                            ) : (
+                              <div className="h-12 w-12 bg-gray-200 rounded flex items-center justify-center">
+                                <span className="text-gray-400 text-xs">
+                                  No photo
+                                </span>
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="text-sm font-medium text-gray-900">
+                              {item.name}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">
+                              {getBrand(item) || "-"}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">
+                              {getPartNumber(item) || "-"}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">
+                              {item.quantity || 0}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-500">
+                              {item.sid || "-"}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {(() => {
+                              // Try to extract Date Received from notes metadata
+                              if (item.notes) {
+                                const dateMatch = item.notes.match(
+                                  /Date Received: ([^|\]]+)/
+                                );
+                                if (dateMatch) return dateMatch[1].trim();
+                              }
+                              // Fallback to custom attributes if available
+                              const dateAttr =
+                                item.custom_attribute_values?.find(
+                                  (attr) =>
+                                    attr.custom_attribute_name ===
+                                    "Date Received"
+                                );
+                              return dateAttr?.value || (
+                                <span className="text-gray-400">—</span>
+                              );
+                            })()}
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="text-sm text-gray-500 max-w-xs truncate">
+                              {(() => {
+                                // Remove metadata from notes display
+                                if (item.notes) {
+                                  const notesWithoutMetadata =
+                                    item.notes.replace(/^\[.*?\]\n?/, "");
+                                  return notesWithoutMetadata || "-";
+                                }
+                                return "-";
+                              })()}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
 

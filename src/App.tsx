@@ -15,6 +15,7 @@ import DeliveryDetail from './pages/DeliveryDetail';
 import EditDelivery from './pages/EditDelivery';
 import ActivityLog from './pages/ActivityLog';
 import Vendors from './pages/Vendors';
+import Settings from './pages/Settings';
 import DashboardLayout from './components/DashboardLayout';
 
 function ManagerLayoutRoute() {
@@ -115,6 +116,7 @@ function AppRoutes() {
         <Route path="activity-log" element={<ActivityLog />} />
         <Route path="vendors" element={<Vendors />} />
         <Route path="drivers" element={<DriverManagement />} />
+        <Route path="settings" element={<Settings />} />
       </Route>
       <Route path="/driver/deliveries" element={<DriverRoute><DriverDeliveries /></DriverRoute>} />
       <Route path="/driver/deliveries/:id" element={<DriverRoute><DriverDeliveryDetail /></DriverRoute>} />

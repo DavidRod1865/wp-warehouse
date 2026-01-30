@@ -5,6 +5,7 @@ import type { User } from '@supabase/supabase-js';
 interface UserProfile {
   id: string;
   email: string | null;
+  name?: string | null;
   username?: string | null;
   role: 'warehouse_manager' | 'driver' | 'apm' | 'admin';
   pin_code: string | null;
@@ -19,6 +20,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
+  updateProfileName: (name: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -96,8 +98,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (error) throw error;
   };
 
+  const updateProfileName = async (name: string) => {
+    if (!user) {
+      throw new Error('No authenticated user');
+    }
+
+    const trimmed = name.trim();
+    const nextName = trimmed.length > 0 ? trimmed : null;
+
+    const { error } = await supabase
+      .from('users')
+      .update({ name: nextName })
+      .eq('id', user.id);
+
+    if (error) throw error;
+
+    setProfile((current) =>
+      current
+        ? {
+            ...current,
+            name: nextName,
+          }
+        : current
+    );
+  };
+
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signIn, signOut, resetPassword }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        profile,
+        loading,
+        signIn,
+        signOut,
+        resetPassword,
+        updateProfileName,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

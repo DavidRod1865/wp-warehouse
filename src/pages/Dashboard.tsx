@@ -1,4 +1,5 @@
 import { useState, useEffect, Fragment } from "react";
+import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import warehouseLogo from "../assets/WP-warehouse-logo.png";
 import { useAuth } from "../contexts/AuthContext";
@@ -58,7 +59,7 @@ interface Truck {
 }
 
 export default function Dashboard() {
-  const { profile, signOut } = useAuth();
+  const { profile } = useAuth();
   const navigate = useNavigate();
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [loading, setLoading] = useState(true);
@@ -273,16 +274,27 @@ export default function Dashboard() {
   const getTruckerName = (truckName: Delivery["truck_name"]) =>
     truckName || "Pending";
 
+  const formatSelectedDate = (value: string) => {
+    if (!value) return "";
+    const [year, month, day] = value.split("-").map(Number);
+    if (!year || !month || !day) return value;
+    return new Date(year, month - 1, day).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  };
+
   return (
     <div className="min-h-full">
       {/* Header */}
       <header className="bg-white shadow">
-        <div className="w-full px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+        <div className="w-full px-4 sm:px-6 lg:px-8 py-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <img
               src={warehouseLogo}
               alt="WP Warehouse"
-              className="h-12 w-auto object-contain"
+              className="h-10 sm:h-12 w-auto object-contain"
             />
             <div>
               <h1 className="text-2xl font-bold text-gray-900">
@@ -291,21 +303,15 @@ export default function Dashboard() {
               <p className="text-sm text-gray-600">Warehouse Delivery</p>
             </div>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="text-right">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 w-full sm:w-auto">
+            <div className="text-left sm:text-right">
               <p className="text-sm font-medium text-gray-900">
-                {profile?.email}
+                {profile?.name || profile?.email}
               </p>
               <p className="text-xs text-gray-500 capitalize">
                 {profile?.role.replace("_", " ")}
               </p>
             </div>
-            <button
-              onClick={signOut}
-              className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 border border-gray-300 rounded-lg hover:bg-gray-50"
-            >
-              Sign Out
-            </button>
           </div>
         </div>
       </header>
@@ -314,19 +320,135 @@ export default function Dashboard() {
       <main className="w-full px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         {/* Deliveries Section */}
         <div>
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
             <h2 className="text-lg font-semibold text-gray-900">Deliveries</h2>
             <button
               onClick={() => navigate("/deliveries/create")}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+              className="hidden sm:inline-flex w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
             >
               + New Delivery
             </button>
           </div>
 
-          {/* Advanced Filters */}
-          <div className="bg-white rounded-lg shadow p-4 mb-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Filters Menu */}
+          <details className="bg-white rounded-lg shadow mb-4 sm:hidden">
+            <summary className="px-4 py-3 cursor-pointer text-sm font-medium text-gray-700 list-none flex items-center justify-between">
+              <div className="flex flex-col gap-1">
+                <span>Filters</span>
+                <span className="text-xs text-gray-500">
+                  {selectedProjectId || selectedTruckId || selectedDate
+                    ? [
+                        selectedProjectId
+                          ? projects.find((p) => p.id === selectedProjectId)
+                              ?.name
+                          : null,
+                        selectedTruckId
+                          ? trucks.find((t) => t.id === selectedTruckId)?.name
+                          : null,
+                        selectedDate
+                          ? formatSelectedDate(selectedDate)
+                          : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" • ")
+                    : "No filters selected"}
+                </span>
+              </div>
+              <svg
+                className="h-4 w-4 text-gray-500"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M4 6h16M4 12h16M4 18h16"
+                />
+              </svg>
+            </summary>
+            <div className="px-4 pb-4 pt-1 space-y-3">
+              <div className="grid grid-cols-1 gap-4">
+                {/* Project Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Project
+                  </label>
+                  <select
+                    value={selectedProjectId || ""}
+                    onChange={(e) =>
+                      setSelectedProjectId(
+                        e.target.value ? parseInt(e.target.value) : null
+                      )
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  >
+                    <option value="">All Projects</option>
+                    {projects.map((project) => (
+                      <option key={project.id} value={project.id}>
+                        {project.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Truck Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Truck
+                  </label>
+                  <select
+                    value={selectedTruckId || ""}
+                    onChange={(e) =>
+                      setSelectedTruckId(
+                        e.target.value ? parseInt(e.target.value) : null
+                      )
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  >
+                    <option value="">All Trucks</option>
+                    {trucks.map((truck) => (
+                      <option key={truck.id} value={truck.id}>
+                        {truck.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Date Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Date
+                  </label>
+                  <input
+                    type="date"
+                    value={selectedDate}
+                    onChange={(e) => setSelectedDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  />
+                </div>
+              </div>
+
+              {(selectedProjectId || selectedTruckId || selectedDate) && (
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => {
+                      setSelectedProjectId(null);
+                      setSelectedTruckId(null);
+                      setSelectedDate("");
+                    }}
+                    className="px-4 py-2 text-sm text-gray-700 hover:text-gray-900 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  >
+                    Clear Filters
+                  </button>
+                </div>
+              )}
+            </div>
+          </details>
+
+          <div className="hidden sm:block bg-white rounded-lg shadow p-4 mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {/* Project Filter */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -387,7 +509,6 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Clear Filters Button */}
             {(selectedProjectId || selectedTruckId || selectedDate) && (
               <div className="mt-3 flex justify-end">
                 <button
@@ -406,7 +527,7 @@ export default function Dashboard() {
 
           {/* Filter Tabs */}
           <div className="bg-white rounded-t-lg border-b border-gray-200">
-            <nav className="flex space-x-8 px-6">
+            <nav className="flex gap-6 px-4 sm:px-6 overflow-x-auto whitespace-nowrap">
               {["all", "draft", "pending", "delivered"].map((status) => (
                 <button
                   key={status}
@@ -441,7 +562,68 @@ export default function Dashboard() {
             </div>
           ) : (
             <div className="bg-white rounded-b-lg shadow overflow-hidden">
-              <table className="min-w-full divide-y divide-gray-200">
+              <div className="sm:hidden divide-y divide-gray-200">
+                {deliveries.map((delivery) => (
+                  <motion.div
+                    key={delivery.id}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="p-4 space-y-3"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-sm font-semibold text-gray-900">
+                          {delivery.delivery_number}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {new Date(delivery.created_at).toLocaleDateString(
+                            "en-US",
+                            {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            }
+                          )}
+                        </div>
+                      </div>
+                      {getStatusBadge(delivery.status)}
+                    </div>
+                    <div className="text-sm text-gray-900">
+                      <span className="text-gray-500">Project: </span>
+                      {delivery.projects?.name || "No Project"}
+                    </div>
+                    <div className="text-sm text-gray-900">
+                      <span className="text-gray-500">From: </span>
+                      {delivery.from_address.company_name ||
+                        delivery.from_address.street_address}
+                    </div>
+                    <div className="text-sm text-gray-900">
+                      <span className="text-gray-500">To: </span>
+                      {delivery.to_address.company_name ||
+                        delivery.to_address.street_address}
+                    </div>
+                    <div className="flex items-center justify-between text-sm text-gray-900">
+                      <span>
+                        <span className="text-gray-500">Truck: </span>
+                        {delivery.truck_name || "-"}
+                      </span>
+                      <span>
+                        <span className="text-gray-500">Pieces: </span>
+                        {delivery.items_count ?? 0}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => navigate(`/deliveries/${delivery.id}`)}
+                      className="w-full px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      View Full Details
+                    </button>
+                  </motion.div>
+                ))}
+              </div>
+              <div className="hidden sm:block overflow-x-auto">
+                <table className="min-w-[900px] divide-y divide-gray-200">
                 <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
                   <tr>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
@@ -456,9 +638,9 @@ export default function Dashboard() {
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                       To
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                      Truck
-                    </th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                        Truck
+                      </th>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                       Status
                     </th>
@@ -516,12 +698,12 @@ export default function Dashboard() {
                           </div>
                         </td>
 
-                        {/* Truck */}
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="text-sm text-gray-900">
-                            {delivery.truck_name || "-"}
-                          </span>
-                        </td>
+                          {/* Truck */}
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className="text-sm text-gray-900">
+                              {delivery.truck_name || "-"}
+                            </span>
+                          </td>
 
                         {/* Status */}
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -575,8 +757,13 @@ export default function Dashboard() {
                       {expandedDeliveryId === delivery.id && (
                         <tr className="bg-gradient-to-r from-blue-50 to-gray-50 animate-fadeIn">
                           <td colSpan={8} className="px-6 py-6">
-                            <div className="space-y-4">
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                              <motion.div
+                                initial={{ opacity: 0, y: 6 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.2 }}
+                                className="space-y-4"
+                              >
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 {/* From Address */}
                                 <div className="bg-white rounded-lg p-4 shadow-sm">
                                   <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
@@ -618,8 +805,8 @@ export default function Dashboard() {
                                 </div>
                               </div>
 
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                {/* Delivery Information */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                  {/* Delivery Information */}
                                 <div className="bg-white rounded-lg p-4 shadow-sm">
                                   <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
                                     Delivery Information
@@ -627,12 +814,12 @@ export default function Dashboard() {
                                   <div className="space-y-2">
                                     <div className="flex justify-between text-sm">
                                       <span className="text-gray-600">
-                                        Delivery Date:
+                                          Delivery Date:
                                       </span>
                                       <span className="font-medium text-gray-900">
                                         {new Date(
                                           delivery.created_at
-                                        ).toLocaleDateString("en-US", {
+                                          ).toLocaleDateString("en-US", {
                                           month: "short",
                                           day: "numeric",
                                           year: "numeric",
@@ -640,102 +827,105 @@ export default function Dashboard() {
                                       </span>
                                     </div>
                                     <div className="flex justify-between text-sm">
-                                      <span className="text-gray-600">Type:</span>
+                                        <span className="text-gray-600">Type:</span>
                                       <span className="font-medium text-gray-900 capitalize">
-                                        {delivery.delivery_type.replace("_", " ")}
+                                        {delivery.delivery_type.replace(
+                                          "_",
+                                          " "
+                                        )}
                                       </span>
                                     </div>
-                                    <div className="flex justify-between text-sm">
-                                      <span className="text-gray-600">
-                                        Trucker:
-                                      </span>
-                                      <span className="font-medium text-gray-900">
-                                        {getTruckerName(delivery.truck_name)}
-                                      </span>
-                                    </div>
-                                  <div className="flex justify-between text-sm">
-                                    <span className="text-gray-600">
-                                      Pieces Delivered:
-                                    </span>
-                                    <span className="font-medium text-gray-900">
-                                      {delivery.items_count ?? 0}
-                                    </span>
-                                  </div>
+                                      <div className="flex justify-between text-sm">
+                                        <span className="text-gray-600">
+                                          Trucker:
+                                        </span>
+                                        <span className="font-medium text-gray-900">
+                                          {getTruckerName(delivery.truck_name)}
+                                        </span>
+                                      </div>
+                                      <div className="flex justify-between text-sm">
+                                        <span className="text-gray-600">
+                                          Pieces Delivered:
+                                        </span>
+                                        <span className="font-medium text-gray-900">
+                                          {delivery.items_count ?? 0}
+                                        </span>
+                                      </div>
                                     <div className="flex justify-between text-sm">
                                       <span className="text-gray-600">
                                         Status:
                                       </span>
-                                      <span>{getStatusBadge(delivery.status)}</span>
+                                        <span>{getStatusBadge(delivery.status)}</span>
+                                      </div>
                                     </div>
                                   </div>
-                                </div>
 
-                                {/* Signature */}
-                                <div className="rounded-lg p-4 shadow-sm bg-green-50 border border-green-200">
-                                  <div className="text-xs font-semibold text-green-800 uppercase tracking-wide mb-3">
-                                    Signature
-                                  </div>
-                                  <div className="space-y-3">
-                                    {delivery.signature_data ? (
-                                      <img
-                                        src={delivery.signature_data}
-                                        alt="Delivery signature"
-                                        className="w-full max-h-48 object-contain border border-green-200 rounded bg-white"
-                                      />
-                                    ) : (
-                                      <div className="text-sm text-green-700">
-                                        {delivery.delivered_at
-                                          ? "Electronic signature refused. See paperwork."
-                                          : "Signature pending confirmation."}
-                                      </div>
-                                    )}
-                                    <div className="space-y-1">
-                                      <div className="flex justify-between text-sm">
-                                        <span className="text-green-800">
-                                          Confirmed Delivery Time:
-                                        </span>
-                                        <span className="font-medium text-gray-900">
+                                  {/* Signature */}
+                                  <div className="rounded-lg p-4 shadow-sm bg-green-50 border border-green-200">
+                                    <div className="text-xs font-semibold text-green-800 uppercase tracking-wide mb-3">
+                                      Signature
+                                    </div>
+                                    <div className="space-y-3">
+                                      {delivery.signature_data ? (
+                                        <img
+                                          src={delivery.signature_data}
+                                          alt="Delivery signature"
+                                          className="w-full max-h-48 object-contain border border-green-200 rounded bg-white"
+                                        />
+                                      ) : (
+                                        <div className="text-sm text-green-700">
                                           {delivery.delivered_at
-                                            ? new Date(
-                                                delivery.delivered_at
-                                              ).toLocaleString("en-US", {
-                                                month: "short",
-                                                day: "numeric",
-                                                year: "numeric",
-                                                hour: "numeric",
-                                                minute: "2-digit",
-                                              })
-                                            : "Pending"}
-                                        </span>
-                                      </div>
-                                      <div className="flex justify-between text-sm">
-                                        <span className="text-green-800">
-                                          Signed By:
-                                        </span>
-                                        <span className="font-medium text-gray-900">
-                                          {delivery.signature_name || "Pending"}
-                                        </span>
+                                            ? "Electronic signature refused. See paperwork."
+                                            : "Signature pending confirmation."}
+                                        </div>
+                                      )}
+                                      <div className="space-y-1">
+                                        <div className="flex justify-between text-sm">
+                                          <span className="text-green-800">
+                                            Confirmed Delivery Time:
+                                          </span>
+                                          <span className="font-medium text-gray-900">
+                                            {delivery.delivered_at
+                                              ? new Date(
+                                                  delivery.delivered_at
+                                                ).toLocaleString("en-US", {
+                                                  month: "short",
+                                                  day: "numeric",
+                                                  year: "numeric",
+                                                  hour: "numeric",
+                                                  minute: "2-digit",
+                                                })
+                                              : "Pending"}
+                                          </span>
+                                        </div>
+                                        <div className="flex justify-between text-sm">
+                                          <span className="text-green-800">
+                                            Signed By:
+                                          </span>
+                                          <span className="font-medium text-gray-900">
+                                            {delivery.signature_name || "Pending"}
+                                      </span>
+                                        </div>
                                       </div>
                                     </div>
                                   </div>
                                 </div>
-                              </div>
 
-                              {/* Quick Actions */}
-                              <div className="bg-white rounded-lg p-4 shadow-sm">
-                                <div className="flex flex-wrap gap-2">
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      navigate(`/deliveries/${delivery.id}`);
-                                    }}
-                                    className="flex-1 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
-                                  >
-                                    View Full Details
-                                  </button>
+                                {/* Quick Actions */}
+                                <div className="bg-white rounded-lg p-4 shadow-sm">
+                                  <div className="flex flex-wrap gap-2">
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        navigate(`/deliveries/${delivery.id}`);
+                                      }}
+                                      className="flex-1 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                                    >
+                                      View Full Details
+                                    </button>
+                                  </div>
                                 </div>
-                              </div>
-                            </div>
+                              </motion.div>
                           </td>
                         </tr>
                       )}
@@ -743,6 +933,7 @@ export default function Dashboard() {
                   ))}
                 </tbody>
               </table>
+              </div>
             </div>
           )}
         </div>

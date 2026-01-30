@@ -1313,92 +1313,94 @@ export default function CreateDelivery() {
                 </div>
               ) : (
                 <div className="border border-gray-200 rounded-lg overflow-hidden">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                          Item
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                          Brand
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                          Part #
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                          Location
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                          Quantity
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {deliveryItems.map((item, index) => (
-                        <tr key={index}>
-                          <td className="px-6 py-4 text-sm text-gray-900">
-                            {item.item_name}
-                          </td>
-                          <td className="px-6 py-4 text-sm text-gray-500">
-                            {item.custom_attribute_values?.find(
-                              (a) =>
-                                a.custom_attribute_name.toLowerCase() ===
-                                "brand"
-                            )?.value || "-"}
-                          </td>
-                          <td className="px-6 py-4 text-sm text-gray-500">
-                            {item.custom_attribute_values?.find(
-                              (a) =>
-                                a.custom_attribute_name.toLowerCase() ===
-                                "part number"
-                            )?.value || "-"}
-                          </td>
-                          <td className="px-6 py-4 text-sm text-gray-500">
-                            {item.location}
-                          </td>
-                          <td className="px-6 py-4 text-sm">
-                            <input
-                              type="number"
-                              min="1"
-                              max={
-                                item.sortly_item_id
-                                  ? item.available_quantity
-                                  : undefined
-                              }
-                              value={item.quantity}
-                              onChange={(e) => {
-                                const newItems = [...deliveryItems];
-                                newItems[index].quantity =
-                                  parseFloat(e.target.value) || 0;
-                                setDeliveryItems(newItems);
-                              }}
-                              className="w-20 px-2 py-1 border border-gray-300 rounded"
-                            />
-                            {item.sortly_item_id && (
-                              <span className="ml-2 text-xs text-gray-500">
-                                / {item.available_quantity}
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-6 py-4 text-sm">
-                            <button
-                              onClick={() => {
-                                setDeliveryItems(
-                                  deliveryItems.filter((_, i) => i !== index)
-                                );
-                              }}
-                              className="text-red-600 hover:text-red-800"
-                            >
-                              Remove
-                            </button>
-                          </td>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-[800px] divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                            Item
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                            Brand
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                            Part #
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                            Location
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                            Quantity
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                            Actions
+                          </th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {deliveryItems.map((item, index) => (
+                          <tr key={index}>
+                            <td className="px-6 py-4 text-sm text-gray-900">
+                              {item.item_name}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-500">
+                              {item.custom_attribute_values?.find(
+                                (a) =>
+                                  a.custom_attribute_name.toLowerCase() ===
+                                  "brand"
+                              )?.value || "-"}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-500">
+                              {item.custom_attribute_values?.find(
+                                (a) =>
+                                  a.custom_attribute_name.toLowerCase() ===
+                                  "part number"
+                              )?.value || "-"}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-500">
+                              {item.location}
+                            </td>
+                            <td className="px-6 py-4 text-sm">
+                              <input
+                                type="number"
+                                min="1"
+                                max={
+                                  item.sortly_item_id
+                                    ? item.available_quantity
+                                    : undefined
+                                }
+                                value={item.quantity}
+                                onChange={(e) => {
+                                  const newItems = [...deliveryItems];
+                                  newItems[index].quantity =
+                                    parseFloat(e.target.value) || 0;
+                                  setDeliveryItems(newItems);
+                                }}
+                                className="w-20 px-2 py-1 border border-gray-300 rounded"
+                              />
+                              {item.sortly_item_id && (
+                                <span className="ml-2 text-xs text-gray-500">
+                                  / {item.available_quantity}
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 text-sm">
+                              <button
+                                onClick={() => {
+                                  setDeliveryItems(
+                                    deliveryItems.filter((_, i) => i !== index)
+                                  );
+                                }}
+                                className="text-red-600 hover:text-red-800"
+                              >
+                                Remove
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
             </div>

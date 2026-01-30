@@ -1725,62 +1725,64 @@ export default function EditDelivery() {
                 </div>
               ) : (
                 <div className="border border-gray-200 rounded-lg overflow-hidden">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                          Item
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                          Location
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                          Quantity
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {deliveryItems.map((item, index) => (
-                        <tr key={index}>
-                          <td className="px-6 py-4 text-sm text-gray-900">
-                            {item.item_name}
-                          </td>
-                          <td className="px-6 py-4 text-sm text-gray-500">
-                            {item.location}
-                          </td>
-                          <td className="px-6 py-4 text-sm">
-                            <input
-                              type="number"
-                              min="1"
-                              value={item.quantity}
-                              onChange={(e) => {
-                                const newItems = [...deliveryItems];
-                                newItems[index].quantity =
-                                  parseFloat(e.target.value) || 0;
-                                setDeliveryItems(newItems);
-                              }}
-                              className="w-20 px-2 py-1 border border-gray-300 rounded"
-                            />
-                          </td>
-                          <td className="px-6 py-4 text-sm">
-                            <button
-                              onClick={() => {
-                                setDeliveryItems(
-                                  deliveryItems.filter((_, i) => i !== index)
-                                );
-                              }}
-                              className="text-red-600 hover:text-red-800"
-                            >
-                              Remove
-                            </button>
-                          </td>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-[700px] divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                            Item
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                            Location
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                            Quantity
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                            Actions
+                          </th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {deliveryItems.map((item, index) => (
+                          <tr key={index}>
+                            <td className="px-6 py-4 text-sm text-gray-900">
+                              {item.item_name}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-500">
+                              {item.location}
+                            </td>
+                            <td className="px-6 py-4 text-sm">
+                              <input
+                                type="number"
+                                min="1"
+                                value={item.quantity}
+                                onChange={(e) => {
+                                  const newItems = [...deliveryItems];
+                                  newItems[index].quantity =
+                                    parseFloat(e.target.value) || 0;
+                                  setDeliveryItems(newItems);
+                                }}
+                                className="w-20 px-2 py-1 border border-gray-300 rounded"
+                              />
+                            </td>
+                            <td className="px-6 py-4 text-sm">
+                              <button
+                                onClick={() => {
+                                  setDeliveryItems(
+                                    deliveryItems.filter((_, i) => i !== index)
+                                  );
+                                }}
+                                className="text-red-600 hover:text-red-800"
+                              >
+                                Remove
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
             </div>

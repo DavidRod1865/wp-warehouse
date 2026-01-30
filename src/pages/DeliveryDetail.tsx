@@ -534,55 +534,58 @@ export default function DeliveryDetail() {
                 Items ({deliveryItems.length})
               </h2>
               <div className="border border-gray-200 rounded-lg overflow-hidden">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                        Item Name
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                        Brand
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                        Part Number
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                        Location
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                        Quantity
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {deliveryItems.map((item) => (
-                      <tr key={item.id}>
-                        <td className="px-6 py-4 text-sm text-gray-900">
-                          {item.item_name}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-500">
-                          {item.custom_attribute_values?.find(
-                            (a) =>
-                              a.custom_attribute_name.toLowerCase() === "brand"
-                          )?.value || "-"}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-500">
-                          {item.custom_attribute_values?.find(
-                            (a) =>
-                              a.custom_attribute_name.toLowerCase() ===
-                              "part number"
-                          )?.value || "-"}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-500">
-                          {item.notes || "-"}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-900">
-                          {item.quantity}
-                        </td>
+                <div className="overflow-x-auto">
+                  <table className="min-w-[700px] divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          Item Name
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          Brand
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          Part Number
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          Location
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          Quantity
+                        </th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {deliveryItems.map((item) => (
+                        <tr key={item.id}>
+                          <td className="px-6 py-4 text-sm text-gray-900">
+                            {item.item_name}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-500">
+                            {item.custom_attribute_values?.find(
+                              (a) =>
+                                a.custom_attribute_name.toLowerCase() ===
+                                "brand"
+                            )?.value || "-"}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-500">
+                            {item.custom_attribute_values?.find(
+                              (a) =>
+                                a.custom_attribute_name.toLowerCase() ===
+                                "part number"
+                            )?.value || "-"}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-500">
+                            {item.notes || "-"}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-900">
+                            {item.quantity}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
 
