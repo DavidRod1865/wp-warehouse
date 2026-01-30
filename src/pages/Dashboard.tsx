@@ -12,10 +12,23 @@ interface Delivery {
   project_id: number | null;
   status: string;
   created_at: string;
+  delivered_at: string | null;
+  signature_name: string | null;
+  signature_data: string | null;
+  items_count?: number;
   from_address: Address;
   to_address: Address;
   delivery_type: string;
   truck_name: string | null;
+  activity_log?: Array<{
+    timestamp: string;
+    action: string;
+    details?: {
+      driver_assigned?: {
+        driver_name?: string;
+      };
+    };
+  }>;
   projects?: {
     name: string;
   } | null;
@@ -185,7 +198,36 @@ export default function Dashboard() {
       const { data, error } = await query;
 
       if (error) throw error;
-      setDeliveries(data || []);
+      const deliveriesData = data || [];
+      const deliveryIds = deliveriesData.map((delivery) => delivery.id);
+
+      if (deliveryIds.length === 0) {
+        setDeliveries(deliveriesData);
+        return;
+      }
+
+      const { data: itemsData, error: itemsError } = await supabase
+        .from("delivery_items")
+        .select("delivery_id, quantity")
+        .in("delivery_id", deliveryIds);
+
+      if (itemsError) throw itemsError;
+
+      const itemsCountByDeliveryId = new Map<number, number>();
+      itemsData?.forEach((item) => {
+        itemsCountByDeliveryId.set(
+          item.delivery_id,
+          (itemsCountByDeliveryId.get(item.delivery_id) || 0) +
+            Number(item.quantity || 0)
+        );
+      });
+
+      const deliveriesWithCounts = deliveriesData.map((delivery) => ({
+        ...delivery,
+        items_count: itemsCountByDeliveryId.get(delivery.id) || 0,
+      }));
+
+      setDeliveries(deliveriesWithCounts);
     } catch (error) {
       console.error("Error fetching deliveries:", error);
     } finally {
@@ -228,11 +270,14 @@ export default function Dashboard() {
     );
   };
 
+  const getTruckerName = (truckName: Delivery["truck_name"]) =>
+    truckName || "Pending";
+
   return (
     <div className="min-h-full">
       {/* Header */}
       <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+        <div className="w-full px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
             <img
               src={warehouseLogo}
@@ -266,7 +311,7 @@ export default function Dashboard() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+      <main className="w-full px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         {/* Deliveries Section */}
         <div>
           <div className="flex items-center justify-between mb-4">
@@ -406,13 +451,13 @@ export default function Dashboard() {
                       Project
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                      Truck
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                       From
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                       To
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                      Truck
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                       Status
@@ -441,9 +486,6 @@ export default function Dashboard() {
                             <span className="text-sm font-semibold text-gray-900">
                               {delivery.delivery_number}
                             </span>
-                            <span className="text-xs text-gray-500 capitalize">
-                              {delivery.delivery_type.replace("_", " ")}
-                            </span>
                           </div>
                         </td>
 
@@ -455,13 +497,6 @@ export default function Dashboard() {
                                 No Project
                               </span>
                             )}
-                          </span>
-                        </td>
-
-                        {/* Truck */}
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="text-sm text-gray-900">
-                            {delivery.truck_name || "-"}
                           </span>
                         </td>
 
@@ -479,6 +514,13 @@ export default function Dashboard() {
                             {delivery.to_address.company_name ||
                               delivery.to_address.street_address}
                           </div>
+                        </td>
+
+                        {/* Truck */}
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="text-sm text-gray-900">
+                            {delivery.truck_name || "-"}
+                          </span>
                         </td>
 
                         {/* Status */}
@@ -533,9 +575,8 @@ export default function Dashboard() {
                       {expandedDeliveryId === delivery.id && (
                         <tr className="bg-gradient-to-r from-blue-50 to-gray-50 animate-fadeIn">
                           <td colSpan={8} className="px-6 py-6">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                              {/* Left Column - Addresses */}
-                              <div className="space-y-4">
+                            <div className="space-y-4">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 {/* From Address */}
                                 <div className="bg-white rounded-lg p-4 shadow-sm">
                                   <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
@@ -552,9 +593,6 @@ export default function Dashboard() {
                                       {delivery.from_address.city},{" "}
                                       {delivery.from_address.state}{" "}
                                       {delivery.from_address.zip_code}
-                                    </div>
-                                    <div className="text-sm text-gray-600">
-                                      Tel: {delivery.from_address.phone}
                                     </div>
                                   </div>
                                 </div>
@@ -576,16 +614,12 @@ export default function Dashboard() {
                                       {delivery.to_address.state}{" "}
                                       {delivery.to_address.zip_code}
                                     </div>
-                                    <div className="text-sm text-gray-600">
-                                      Tel: {delivery.to_address.phone}
-                                    </div>
                                   </div>
                                 </div>
                               </div>
 
-                              {/* Right Column - Metadata & Actions */}
-                              <div className="space-y-4">
-                                {/* Metadata */}
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {/* Delivery Information */}
                                 <div className="bg-white rounded-lg p-4 shadow-sm">
                                   <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
                                     Delivery Information
@@ -593,70 +627,112 @@ export default function Dashboard() {
                                   <div className="space-y-2">
                                     <div className="flex justify-between text-sm">
                                       <span className="text-gray-600">
-                                        Created:
+                                        Delivery Date:
                                       </span>
                                       <span className="font-medium text-gray-900">
                                         {new Date(
                                           delivery.created_at
-                                        ).toLocaleString("en-US", {
+                                        ).toLocaleDateString("en-US", {
                                           month: "short",
                                           day: "numeric",
                                           year: "numeric",
-                                          hour: "numeric",
-                                          minute: "2-digit",
                                         })}
                                       </span>
                                     </div>
                                     <div className="flex justify-between text-sm">
-                                      <span className="text-gray-600">
-                                        Type:
-                                      </span>
+                                      <span className="text-gray-600">Type:</span>
                                       <span className="font-medium text-gray-900 capitalize">
-                                        {delivery.delivery_type.replace(
-                                          "_",
-                                          " "
-                                        )}
+                                        {delivery.delivery_type.replace("_", " ")}
                                       </span>
                                     </div>
                                     <div className="flex justify-between text-sm">
                                       <span className="text-gray-600">
+                                        Trucker:
+                                      </span>
+                                      <span className="font-medium text-gray-900">
+                                        {getTruckerName(delivery.truck_name)}
+                                      </span>
+                                    </div>
+                                  <div className="flex justify-between text-sm">
+                                    <span className="text-gray-600">
+                                      Pieces Delivered:
+                                    </span>
+                                    <span className="font-medium text-gray-900">
+                                      {delivery.items_count ?? 0}
+                                    </span>
+                                  </div>
+                                    <div className="flex justify-between text-sm">
+                                      <span className="text-gray-600">
                                         Status:
                                       </span>
-                                      <span>
-                                        {getStatusBadge(delivery.status)}
-                                      </span>
+                                      <span>{getStatusBadge(delivery.status)}</span>
                                     </div>
                                   </div>
                                 </div>
 
-                                {/* Quick Actions */}
-                                <div className="bg-white rounded-lg p-4 shadow-sm">
-                                  <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-                                    Quick Actions
+                                {/* Signature */}
+                                <div className="rounded-lg p-4 shadow-sm bg-green-50 border border-green-200">
+                                  <div className="text-xs font-semibold text-green-800 uppercase tracking-wide mb-3">
+                                    Signature
                                   </div>
-                                  <div className="flex flex-wrap gap-2">
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        navigate(`/deliveries/${delivery.id}`);
-                                      }}
-                                      className="flex-1 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
-                                    >
-                                      View Full Details
-                                    </button>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        navigate(
-                                          `/deliveries/${delivery.id}/edit`
-                                        );
-                                      }}
-                                      className="flex-1 px-4 py-2 bg-white text-gray-700 text-sm font-medium border border-gray-300 rounded-lg hover:bg-gray-50
-     transition-colors"
-                                    >
-                                      Edit
-                                    </button>
+                                  <div className="space-y-3">
+                                    {delivery.signature_data ? (
+                                      <img
+                                        src={delivery.signature_data}
+                                        alt="Delivery signature"
+                                        className="w-full max-h-48 object-contain border border-green-200 rounded bg-white"
+                                      />
+                                    ) : (
+                                      <div className="text-sm text-green-700">
+                                        {delivery.delivered_at
+                                          ? "Electronic signature refused. See paperwork."
+                                          : "Signature pending confirmation."}
+                                      </div>
+                                    )}
+                                    <div className="space-y-1">
+                                      <div className="flex justify-between text-sm">
+                                        <span className="text-green-800">
+                                          Confirmed Delivery Time:
+                                        </span>
+                                        <span className="font-medium text-gray-900">
+                                          {delivery.delivered_at
+                                            ? new Date(
+                                                delivery.delivered_at
+                                              ).toLocaleString("en-US", {
+                                                month: "short",
+                                                day: "numeric",
+                                                year: "numeric",
+                                                hour: "numeric",
+                                                minute: "2-digit",
+                                              })
+                                            : "Pending"}
+                                        </span>
+                                      </div>
+                                      <div className="flex justify-between text-sm">
+                                        <span className="text-green-800">
+                                          Signed By:
+                                        </span>
+                                        <span className="font-medium text-gray-900">
+                                          {delivery.signature_name || "Pending"}
+                                        </span>
+                                      </div>
+                                    </div>
                                   </div>
+                                </div>
+                              </div>
+
+                              {/* Quick Actions */}
+                              <div className="bg-white rounded-lg p-4 shadow-sm">
+                                <div className="flex flex-wrap gap-2">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      navigate(`/deliveries/${delivery.id}`);
+                                    }}
+                                    className="flex-1 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                                  >
+                                    View Full Details
+                                  </button>
                                 </div>
                               </div>
                             </div>
