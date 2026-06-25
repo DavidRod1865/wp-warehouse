@@ -1,0 +1,189 @@
+@import "tailwindcss";
+
+@plugin "daisyui";
+
+/* ── With Pride — light theme ───────────────────────────── */
+@plugin "daisyui/theme" {
+  name: "withpride";
+  default: true;
+  prefersdark: false;
+  color-scheme: light;
+
+  --color-base-100: #ffffff;
+  --color-base-200: #f6f7f9;
+  --color-base-300: #e4e7ec;
+  --color-base-content: #0f1729;
+  --color-primary: #0f1729;
+  --color-primary-content: #ffffff;
+  --color-secondary: #c47b1a;
+  --color-secondary-content: #ffffff;
+  --color-accent: #2d6a8c;
+  --color-accent-content: #ffffff;
+  --color-neutral: #5c6478;
+  --color-neutral-content: #ffffff;
+  --color-info: #2d6a8c;
+  --color-info-content: #ffffff;
+  --color-success: #136c3a;
+  --color-success-content: #ffffff;
+  --color-warning: #9a6212;
+  --color-warning-content: #ffffff;
+  --color-error: #9a2b2b;
+  --color-error-content: #ffffff;
+
+  --radius-selector: 0.5rem;
+  --radius-field: 0.4375rem;
+  --radius-box: 0.625rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 1;
+  --noise: 0;
+}
+
+/* ── With Pride — dark theme ────────────────────────────── */
+@plugin "daisyui/theme" {
+  name: "withpride-dark";
+  default: false;
+  prefersdark: true;
+  color-scheme: dark;
+
+  --color-base-100: #10182b;
+  --color-base-200: #0b1020;
+  --color-base-300: #242d46;
+  --color-base-content: #eef0f6;
+  --color-primary: #eef0f6;
+  --color-primary-content: #0b1020;
+  --color-secondary: #e4a256;
+  --color-secondary-content: #0b1020;
+  --color-accent: #6ec48a;
+  --color-accent-content: #0b1020;
+  --color-neutral: #8b92a8;
+  --color-neutral-content: #0b1020;
+  --color-info: #6ec48a;
+  --color-info-content: #0b1020;
+  --color-success: #6ec48a;
+  --color-success-content: #153220;
+  --color-warning: #d9a05a;
+  --color-warning-content: #38290f;
+  --color-error: #d97e79;
+  --color-error-content: #3a1c1c;
+
+  --radius-selector: 0.5rem;
+  --radius-field: 0.4375rem;
+  --radius-box: 0.625rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 1;
+  --noise: 0;
+}
+
+/* ── Design tokens (extend beyond DaisyUI) ──────────────── */
+:root {
+  --bg:         #f6f7f9;
+  --panel:      #ffffff;
+  --panel-2:    #f1f3f6;
+  --line:       #e4e7ec;
+  --line-2:     #d0d5dd;
+  --ink:        #0f1729;
+  --ink-2:      #1f2a44;
+  --on-ink:     #ffffff;
+  --muted:      #5c6478;
+  --faint:      #98a1b2;
+  --signal:     #c47b1a;
+  --ok:         #136c3a;
+  --ok-soft:    #dcefe2;
+  --info:       #1d4ed8;
+  --info-soft:  #dbeafe;
+  --warn:       #9a6212;
+  --warn-soft:  #fbeccc;
+  --danger:     #9a2b2b;
+  --danger-soft:#f6d9d4;
+  --shadow-sm:  0 1px 0 rgba(15,23,41,.04), 0 1px 2px rgba(15,23,41,.05);
+  --shadow:     0 1px 0 rgba(15,23,41,.04), 0 8px 24px -10px rgba(15,23,41,.14);
+  --radius:     10px;
+  --radius-sm:  6px;
+  --sans:       "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --mono:       "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  --serif:      "IBM Plex Serif", Georgia, serif;
+}
+
+[data-theme="withpride-dark"] {
+  --bg:         #0b1020;
+  --panel:      #10182b;
+  --panel-2:    #172137;
+  --line:       #242d46;
+  --line-2:     #394466;
+  --ink:        #eef0f6;
+  --ink-2:      #cdd1de;
+  --on-ink:     #0b1020;
+  --muted:      #8b92a8;
+  --faint:      #5d6683;
+  --signal:     #e4a256;
+  --ok:         #6ec48a;
+  --ok-soft:    #153220;
+  --info:       #93bbfd;
+  --info-soft:  #1e3a8a;
+  --warn:       #d9a05a;
+  --warn-soft:  #38290f;
+  --danger:     #d97e79;
+  --danger-soft:#3a1c1c;
+  --shadow-sm:  0 1px 0 rgba(0,0,0,.35), 0 1px 2px rgba(0,0,0,.35);
+  --shadow:     0 1px 0 rgba(0,0,0,.3), 0 10px 30px -10px rgba(0,0,0,.6);
+}
+
+/* ── Brand icon dark-mode inversion ─────────────────────── */
+.warehouse-icon {
+  transition: filter 0.2s ease;
+}
+[data-theme="withpride-dark"] .warehouse-icon {
+  filter: invert(1);
+}
+
+/* ── Base styles ────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-feature-settings: "ss01", "cv11";
+}
+
+/* ── Form inputs ───────────────────────────────────────── */
+.form-input {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--panel);
+  color: var(--ink);
+  font-size: 13.5px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.form-input:focus {
+  border-color: var(--ink-2);
+}
+.form-input::placeholder {
+  color: var(--faint);
+}
+
+/* ── Animations ─────────────────────────────────────────── */
+@keyframes slideInRight {
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+
+@keyframes indeterminateSlide {
+  0%   { left: -33%; }
+  50%  { left: 100%; }
+  100% { left: -33%; }
+}
+
+@keyframes pulse-ring {
+  0%   { box-shadow: 0 0 0 0 color-mix(in oklab, var(--ok) 55%, transparent); }
+  70%  { box-shadow: 0 0 0 8px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
