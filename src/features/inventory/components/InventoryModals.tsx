@@ -9,7 +9,7 @@ import { sortlyKeys } from '../hooks/sortlyKeys'
 import { AdjustQuantityModal } from './AdjustQuantityModal'
 import { EditItemModal } from './EditItemModal'
 import { AddItemModal } from './AddItemModal'
-import type { EnrichedItem } from '../hooks/useInventoryData'
+import type { EnrichedItem, LocationOption } from '../hooks/useInventoryData'
 
 export type ModalState =
   | { type: 'none' }
@@ -21,8 +21,8 @@ export type ModalState =
 interface InventoryModalsProps {
   modal: ModalState
   onSetModal: (state: ModalState) => void
-  locationOptions: Array<{ id: number | string; name: string }>
-  activeFolderId: string | null
+  locationOptions: LocationOption[]
+  activeFolderId: number | null
   activeLocationLabel: string
   isProjectView: boolean
 }

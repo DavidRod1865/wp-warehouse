@@ -16,7 +16,7 @@ interface InventoryFilterBarProps {
   selectedProjectId: number | null
   projectOptions: FilterBarOption[]
   onSetSelectedProjectId: (id: number | null) => void
-  activeProject: { sortly_jobsite_folder_id: string | null } | null
+  activeProject: { sortly_jobsite_folder_id?: number | null } | null
   projectSubView: 'warehouse' | 'jobsite'
   onSetProjectSubView: (view: 'warehouse' | 'jobsite') => void
   hasActiveFilter: boolean

@@ -101,6 +101,7 @@ export function ReceiptHeaderForm({
       confidence: item.confidence,
       action: 'pending',
       sortly_item_id: null,
+      sortly_item_name: null,
       sortly_current_quantity: null,
       destination_folder_id: destinationFolderId,
       destination_folder_name: null,

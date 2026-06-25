@@ -19,7 +19,7 @@ interface InventoryTableProps {
     getReceivedDate: (brand: string, poNumber: string | null) => string | null
   }
   currentPage: number
-  onSetCurrentPage: (page: number) => void
+  onSetCurrentPage: (page: number | ((prev: number) => number)) => void
   onEditQuantity: (item: EnrichedItem) => void
   onEditItem: (item: EnrichedItem) => void
   onDelete: (item: EnrichedItem) => void

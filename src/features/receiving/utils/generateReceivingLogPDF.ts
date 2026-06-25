@@ -10,7 +10,7 @@
  */
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
-import type { DailyReceivingLog, ReceivingEntryWithItems } from '../features/receiving/types'
+import type { DailyReceivingLog, ReceivingEntryWithItems } from '../types'
 
 function formatLongDate(iso: string): string {
   const d = new Date(iso + 'T00:00:00')
