@@ -110,6 +110,15 @@ const icons = {
   'chevron-right': (p: SVGProps<SVGSVGElement>) => (
     <svg {...sp} {...p}><path d="M9 6l6 6-6 6" /></svg>
   ),
+  briefcase: (p: SVGProps<SVGSVGElement>) => (
+    <svg {...sp} {...p}><rect x="2" y="7" width="20" height="13" rx="2" ry="2" /><path d="M16 7V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v3" /></svg>
+  ),
+  building: (p: SVGProps<SVGSVGElement>) => (
+    <svg {...sp} {...p}><path d="M4 3h16v18H4z" /><path d="M8 7h2v3H8zM14 7h2v3h-2zM8 12h2v3H8zM14 12h2v3h-2zM8 17h2v2H8zM14 17h2v2h-2zM4 21h16" /></svg>
+  ),
+  'shopping-cart': (p: SVGProps<SVGSVGElement>) => (
+    <svg {...sp} {...p}><circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" /><path d="M1 1h4l2.7 12.3a2 2 0 0 0 2 1.7h9.7a2 2 0 0 0 2-1.7L23 6H6" /></svg>
+  ),
 }
 
 export type IconName = keyof typeof icons

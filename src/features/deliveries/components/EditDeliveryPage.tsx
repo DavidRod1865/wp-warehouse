@@ -104,7 +104,7 @@ export default function EditDeliveryPage() {
         defaultValues={{
           delivery_number: delivery.delivery_number,
           po_reference: delivery.po_reference || '',
-          project_id: delivery.project_id,
+          project_id: delivery.project_id ?? undefined,
           truck_folder_id: delivery.truck_sortly_folder_id,
           from_location_id: delivery.from_location_id,
           from_address: delivery.from_address,
@@ -112,6 +112,7 @@ export default function EditDeliveryPage() {
           items: formItems,
           driver_id: delivery.driver_id,
           status: delivery.status,
+          delivery_type: 'commercial',
         }}
         onSubmit={handleSubmit}
         isEdit

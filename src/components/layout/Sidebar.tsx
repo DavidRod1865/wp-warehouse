@@ -27,6 +27,12 @@ const operationsNav: NavItem[] = [
   { to: '/deliveries', label: 'Deliveries', icon: 'truck' },
 ]
 
+const directoryNav: NavItem[] = [
+  { to: '/projects', label: 'Projects', icon: 'briefcase' },
+  { to: '/clients', label: 'Clients', icon: 'building' },
+  { to: '/vendors', label: 'Vendors', icon: 'shopping-cart' },
+]
+
 const fieldNav: NavItem[] = [
   { to: '/users', label: 'Users', icon: 'users' },
 ]
@@ -135,6 +141,7 @@ export function Sidebar() {
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto px-2.5 flex flex-col gap-px">
           <NavSection title="Operations" items={operationsNav} onClose={close} />
+          <NavSection title="Directory" items={directoryNav} onClose={close} />
           <NavSection title="Field" items={fieldNav} onClose={close} />
           <NavSection title="Data" items={dataNav} onClose={close} />
         </nav>

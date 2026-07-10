@@ -39,6 +39,9 @@ const DeliveriesPage = lazy(() => import('../features/deliveries/components/Deli
 const InventoryPage = lazy(() => import('../features/inventory/components/InventoryPage'))
 const LocationsPage = lazy(() => import('../features/inventory/components/LocationsPage'))
 const ReceivingPage = lazy(() => import('../features/receiving/components/ReceivingPage'))
+const ClientsPage = lazy(() => import('../features/clients/components/ClientsPage'))
+const VendorsPage = lazy(() => import('../features/vendors/components/VendorsPage'))
+const ProjectsPage = lazy(() => import('../features/projects/components/ProjectsPage'))
 
 export const router = createBrowserRouter([
   // Public routes
@@ -58,6 +61,9 @@ export const router = createBrowserRouter([
           { path: '/deliveries/:id', element: <EditDeliveryPage /> },
           { path: '/inventory', element: <InventoryPage /> },
           { path: '/locations', element: <LocationsPage /> },
+          { path: '/clients', element: <ClientsPage /> },
+          { path: '/vendors', element: <VendorsPage /> },
+          { path: '/projects', element: <ProjectsPage /> },
           { path: '/batches', element: <ComingSoon /> },
           { path: '/packing-lists', element: <ComingSoon /> },
           { path: '/receiving', element: <ReceivingPage /> },

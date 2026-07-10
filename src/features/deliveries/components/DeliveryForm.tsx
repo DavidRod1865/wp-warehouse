@@ -39,7 +39,7 @@ export function DeliveryForm({
     defaultValues: {
       delivery_number: '',
       po_reference: '',
-      project_id: null,
+      project_id: undefined,
       truck_folder_id: null,
       from_location_id: null,
       from_address: DEFAULT_FROM_ADDRESS,
@@ -47,8 +47,9 @@ export function DeliveryForm({
       items: [],
       driver_id: null,
       status: 'pending',
+      delivery_type: 'commercial',
       ...defaultValues,
-    },
+    } as DeliveryFormValues,
   })
 
   const { fields, append, remove } = useFieldArray({ control, name: 'items' })

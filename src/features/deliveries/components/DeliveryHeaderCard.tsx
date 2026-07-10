@@ -43,17 +43,17 @@ export function DeliveryHeaderCard({
             />
           </FormField>
 
-          <FormField label="Project">
+          <FormField label="Project" required error={errors.project_id?.message}>
             <Controller
               name="project_id"
               control={control}
               render={({ field }) => (
                 <select
-                  className="form-input"
+                  className={`form-input ${errors.project_id ? 'border-[var(--danger)]' : ''}`}
                   value={field.value ?? ''}
                   onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
                 >
-                  <option value="">No Project (Residential)</option>
+                  <option value="">Select project…</option>
                   {projects.map((p) => (
                     <option key={p.id} value={p.id}>{p.name}</option>
                   ))}

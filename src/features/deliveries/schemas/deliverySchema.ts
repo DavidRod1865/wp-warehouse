@@ -40,7 +40,7 @@ const deliveryItemSchema = z.object({
 export const deliverySchema = z.object({
   delivery_number: z.string().min(1, 'Delivery number is required'),
   po_reference: z.string(),
-  project_id: z.number().nullable(),
+  project_id: z.number().min(1, 'Please select a project'),
   truck_folder_id: z.number().nullable(),
   from_location_id: z.number().nullable(),
   from_address: addressSchema,
@@ -48,6 +48,8 @@ export const deliverySchema = z.object({
   items: z.array(deliveryItemSchema).min(1, 'At least one item is required'),
   driver_id: z.string().nullable(),
   status: z.enum(['draft', 'pending', 'in_transit', 'delivered', 'cancelled']),
+  // Phase 2: Commercial-only; delivery_type is hardcoded to 'commercial' on all new deliveries
+  delivery_type: z.literal('commercial'),
 }).superRefine((data, ctx) => {
   if (data.truck_folder_id === null) {
     ctx.addIssue({
