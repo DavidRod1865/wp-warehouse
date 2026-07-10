@@ -9,6 +9,7 @@
  *     /deliveries/new     — Create delivery
  *     /deliveries/:id     — Edit delivery
  *     /inventory          — Inventory browser
+ *     /locations          — Location management (Warehouse, Trucks, Job Sites)
  *     /batches            — Batch management
  *     /packing-lists      — Packing list viewer
  *     /receiving          — Receiving log
@@ -36,6 +37,7 @@ const CreateDeliveryPage = lazy(() => import('../features/deliveries/components/
 const EditDeliveryPage = lazy(() => import('../features/deliveries/components/EditDeliveryPage'))
 const DeliveriesPage = lazy(() => import('../features/deliveries/components/DeliveriesPage'))
 const InventoryPage = lazy(() => import('../features/inventory/components/InventoryPage'))
+const LocationsPage = lazy(() => import('../features/inventory/components/LocationsPage'))
 const ReceivingPage = lazy(() => import('../features/receiving/components/ReceivingPage'))
 
 export const router = createBrowserRouter([
@@ -55,6 +57,7 @@ export const router = createBrowserRouter([
           { path: '/deliveries/new', element: <CreateDeliveryPage /> },
           { path: '/deliveries/:id', element: <EditDeliveryPage /> },
           { path: '/inventory', element: <InventoryPage /> },
+          { path: '/locations', element: <LocationsPage /> },
           { path: '/batches', element: <ComingSoon /> },
           { path: '/packing-lists', element: <ComingSoon /> },
           { path: '/receiving', element: <ReceivingPage /> },

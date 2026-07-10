@@ -23,6 +23,7 @@ const operationsNav: NavItem[] = [
   { to: '/', label: 'Dashboard', icon: 'home', end: true },
   { to: '/receiving', label: 'Receiving', icon: 'clipboard' },
   { to: '/inventory', label: 'Inventory', icon: 'box' },
+  { to: '/locations', label: 'Locations', icon: 'box' },
   { to: '/deliveries', label: 'Deliveries', icon: 'truck' },
 ]
 
