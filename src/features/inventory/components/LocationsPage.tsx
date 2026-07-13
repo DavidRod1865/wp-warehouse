@@ -1,7 +1,12 @@
 /**
- * LocationsPage — Manage warehouse, truck, and job site locations
+ * LocationsPage — Manage warehouse and truck locations
+ *
+ * Job sites are NOT created here: every project's address IS its job site,
+ * so job_site locations are created/updated automatically with the project
+ * (src/features/projects/hooks/useProjectMutations.ts) and shown read-only.
  */
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useLocations } from '../hooks/useLocations'
 import { useCreateLocation, useUpdateLocation } from '../hooks/useInventoryMutations'
 import { Icon } from '../../../components/ui/Icon'
@@ -63,16 +68,23 @@ export default function LocationsPage() {
         ))}
       </div>
 
-      {/* Actions */}
-      <div className="mb-6 flex gap-2">
-        <button
-          onClick={() => setModal({ type: 'create' })}
-          className="px-4 py-2 rounded-lg text-white text-sm font-medium hover:opacity-90"
-          style={{ background: 'var(--signal)' }}
-        >
-          <Icon name="plus" className="w-4 h-4 inline mr-1" />
-          New {typeLabels[activeTab].slice(0, -1)}
-        </button>
+      {/* Actions — job sites are derived from projects, not created here */}
+      <div className="mb-6 flex gap-2 items-center">
+        {activeTab === 'job_site' ? (
+          <p className="text-sm text-[var(--muted)]">
+            Job sites are created automatically from a project's address. Manage them on the{' '}
+            <Link to="/projects" className="text-[var(--signal)] hover:underline">Projects</Link> page.
+          </p>
+        ) : (
+          <button
+            onClick={() => setModal({ type: 'create' })}
+            className="px-4 py-2 rounded-lg text-white text-sm font-medium hover:opacity-90"
+            style={{ background: 'var(--signal)' }}
+          >
+            <Icon name="plus" className="w-4 h-4 inline mr-1" />
+            New {typeLabels[activeTab].slice(0, -1)}
+          </button>
+        )}
       </div>
 
       {/* Locations List */}
@@ -164,12 +176,14 @@ function LocationCard({
             </div>
           )}
         </div>
-        <button
-          onClick={onEdit}
-          className="p-2 rounded-lg text-[var(--muted)] hover:bg-[var(--panel-2)]"
-        >
-          <Icon name="edit" className="w-4 h-4" />
-        </button>
+        {location.location_type !== 'job_site' && (
+          <button
+            onClick={onEdit}
+            className="p-2 rounded-lg text-[var(--muted)] hover:bg-[var(--panel-2)]"
+          >
+            <Icon name="edit" className="w-4 h-4" />
+          </button>
+        )}
       </div>
     </div>
   )
@@ -187,7 +201,6 @@ function LocationFormModal({ type, location, locations, onClose }: LocationFormM
   const [locationType, setLocationType] = useState<LocationType>(type ?? location?.location_type ?? 'warehouse_area')
   const [parentId, setParentId] = useState<number | null>(location?.parent_location_id ?? null)
   const [isActive, setIsActive] = useState(location?.is_active ?? true)
-  const [address, setAddress] = useState<Record<string, string>>(location?.address ?? {})
   const [saving, setSaving] = useState(false)
 
   const createLocation = useCreateLocation()
@@ -209,7 +222,6 @@ function LocationFormModal({ type, location, locations, onClose }: LocationFormM
           location_type: locationType,
           parent_location_id: parentId,
           is_active: isActive,
-          address: Object.keys(address).length > 0 ? address : null,
         })
         toast(`"${name.trim()}" updated`)
       } else {
@@ -218,7 +230,6 @@ function LocationFormModal({ type, location, locations, onClose }: LocationFormM
           location_type: locationType,
           parent_location_id: parentId,
           is_active: isActive,
-          address: Object.keys(address).length > 0 ? address : null,
         })
         toast(`"${name.trim()}" created`)
       }
@@ -233,13 +244,10 @@ function LocationFormModal({ type, location, locations, onClose }: LocationFormM
 
   const isValid = name.trim().length > 0
 
-  // Parent location options (only for job_site)
-  const parentOptions =
-    locationType === 'job_site'
-      ? locations.filter((l) => l.id !== location?.id && l.location_type === 'warehouse_area')
-      : []
-
-  const showAddressFields = locationType === 'job_site'
+  // Parent hierarchy applies to warehouse areas (e.g. shelf under an area)
+  const parentOptions = locations.filter(
+    (l) => l.id !== location?.id && l.location_type === 'warehouse_area'
+  )
 
   return (
     <div
@@ -293,7 +301,6 @@ function LocationFormModal({ type, location, locations, onClose }: LocationFormM
             >
               <option value="warehouse_area">Warehouse Area</option>
               <option value="truck">Truck</option>
-              <option value="job_site">Job Site</option>
             </select>
           </FormField>
 
@@ -313,56 +320,6 @@ function LocationFormModal({ type, location, locations, onClose }: LocationFormM
                 ))}
               </select>
             </FormField>
-          )}
-
-          {showAddressFields && (
-            <>
-              <FormField label="Street">
-                <input
-                  type="text"
-                  value={address.street ?? ''}
-                  onChange={(e) => setAddress({ ...address, street: e.target.value })}
-                  placeholder="Street address"
-                  className="form-input w-full"
-                  disabled={saving}
-                />
-              </FormField>
-
-              <div className="grid grid-cols-2 gap-3">
-                <FormField label="City">
-                  <input
-                    type="text"
-                    value={address.city ?? ''}
-                    onChange={(e) => setAddress({ ...address, city: e.target.value })}
-                    placeholder="City"
-                    className="form-input w-full"
-                    disabled={saving}
-                  />
-                </FormField>
-
-                <FormField label="State">
-                  <input
-                    type="text"
-                    value={address.state ?? ''}
-                    onChange={(e) => setAddress({ ...address, state: e.target.value })}
-                    placeholder="State"
-                    className="form-input w-full"
-                    disabled={saving}
-                  />
-                </FormField>
-              </div>
-
-              <FormField label="Zip">
-                <input
-                  type="text"
-                  value={address.zip ?? ''}
-                  onChange={(e) => setAddress({ ...address, zip: e.target.value })}
-                  placeholder="Zip"
-                  className="form-input w-full"
-                  disabled={saving}
-                />
-              </FormField>
-            </>
           )}
 
           <label className="flex items-center gap-2 cursor-pointer mt-4">

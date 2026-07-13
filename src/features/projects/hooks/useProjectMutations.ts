@@ -84,7 +84,7 @@ export function useUpdateProject() {
       id: number
       values: Partial<ProjectFormValues>
     }) => {
-      const updateData: Record<string, any> = {}
+      const updateData: Record<string, unknown> = {}
 
       if (values.name !== undefined) updateData.name = values.name
       if (values.gc_id !== undefined) updateData.gc_id = values.gc_id
@@ -102,7 +102,47 @@ export function useUpdateProject() {
         .single()
 
       if (error) throw error
-      return data as Project
+      const project = data as Project
+
+      // The project's address IS its job site — keep the derived job_site
+      // location in sync, creating it for legacy projects that predate the link
+      if (values.name !== undefined || values.project_address !== undefined) {
+        const locationFields = {
+          name: project.name,
+          address: project.project_address
+            ? {
+                street: project.project_address.street_address,
+                city: project.project_address.city,
+                state: project.project_address.state,
+                zip: project.project_address.zip_code,
+                phone: project.project_address.phone,
+              }
+            : null,
+        }
+
+        if (project.job_site_location_id) {
+          const { error: locError } = await supabase
+            .from('locations')
+            .update(locationFields)
+            .eq('id', project.job_site_location_id)
+          if (locError) throw locError
+        } else {
+          const { data: newLoc, error: locError } = await supabase
+            .from('locations')
+            .insert([{ ...locationFields, location_type: 'job_site' }])
+            .select()
+            .single()
+          if (locError) throw locError
+
+          const { error: linkError } = await supabase
+            .from('projects')
+            .update({ job_site_location_id: newLoc.id })
+            .eq('id', id)
+          if (linkError) throw linkError
+        }
+      }
+
+      return project
     },
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: projectKeys.all })
