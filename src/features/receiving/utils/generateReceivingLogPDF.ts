@@ -75,7 +75,8 @@ function computeStats(entries: ReceivingEntryWithItems[]): Stats {
       unitsReceived += item.quantity_received
       if (item.action === 'update') updated += 1
       if (item.action === 'create') created += 1
-      if (item.destination_folder_name) destinations.add(item.destination_folder_name)
+      const destName = item.destination_folder_name || String(item.destination_location_id ?? '')
+      if (destName) destinations.add(destName)
     }
   }
 
@@ -90,7 +91,7 @@ function computeStats(entries: ReceivingEntryWithItems[]): Stats {
   }
 }
 
-export function generateReceivingLogPDF(log: DailyReceivingLog): void {
+export function generateReceivingLogPDF(log: DailyReceivingLog, locationNameMap?: Map<number, string>): void {
   const doc = new jsPDF()
   const entries = log.entries
   const stats = computeStats(entries)
@@ -165,7 +166,9 @@ export function generateReceivingLogPDF(log: DailyReceivingLog): void {
     const activeItems = entry.items.filter((i) => i.action !== 'skip')
     const units = activeItems.reduce((sum, i) => sum + i.quantity_received, 0)
     const destination =
-      entry.project_name ?? (entry.destination_type === 'warehouse' ? 'Main Warehouse' : '—')
+      (entry.destination_location_id && locationNameMap?.get(entry.destination_location_id)) ??
+      entry.project_name ??
+      (entry.destination_type === 'warehouse' ? 'Main Warehouse' : '—')
     return [
       formatTime(entry.created_at),
       entry.vendor,
@@ -216,27 +219,29 @@ export function generateReceivingLogPDF(log: DailyReceivingLog): void {
     doc.text(formatTime(entry.created_at), 190, headerY, { align: 'right' })
     doc.setTextColor(0, 0, 0)
 
-    const detailRows = entry.items.map((item) => [
-      item.item_name,
-      item.part_number || '—',
-      item.destination_folder_name || '—',
-      actionLabel(item.action),
-      item.sortly_quantity_before !== null ? String(item.sortly_quantity_before) : '—',
-      `+${item.quantity_received}`,
-      item.sortly_quantity_after !== null ? String(item.sortly_quantity_after) : '—',
-    ])
+    const detailRows = entry.items.map((item) => {
+      const itemDest =
+        (item.destination_location_id && locationNameMap?.get(item.destination_location_id)) ??
+        item.destination_folder_name ??
+        '—'
+      return [
+        item.item_name,
+        item.part_number || '—',
+        itemDest,
+        actionLabel(item.action),
+        `+${item.quantity_received}`,
+      ]
+    })
 
     autoTable(doc, {
       startY: headerY + 3,
-      head: [['Item', 'Part #', 'Destination', 'Action', 'Before', 'Received', 'After']],
+      head: [['Item', 'Part #', 'Destination', 'Action', 'Received']],
       body: detailRows,
       theme: 'grid',
       headStyles: { fillColor: [220, 220, 220], fontSize: 8, textColor: [0, 0, 0] },
       bodyStyles: { fontSize: 8 },
       columnStyles: {
-        4: { cellWidth: 18, halign: 'right' },
-        5: { cellWidth: 22, halign: 'right', fontStyle: 'bold', textColor: [196, 123, 26] },
-        6: { cellWidth: 18, halign: 'right' },
+        4: { cellWidth: 22, halign: 'right', fontStyle: 'bold', textColor: [196, 123, 26] },
       },
       margin: { left: 25, right: 20 },
     })

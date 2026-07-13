@@ -1,37 +1,72 @@
 /**
- * ReceiptHeaderForm — Step 1 of the receiving workflow
+ * ReceiptHeaderForm — Step 1 of the receiving workflow (Phase 4)
  *
- * Collects: vendor/brand, PO number, date received, destination (project or warehouse),
- * and input method (PDF upload or manual entry).
+ * Collects:
+ *  - Vendor (selector from vendors table, with free-text fallback for PO-less)
+ *  - Link to Purchase Order (confirmed/partially_received, filtered by project)
+ *  - Date received
+ *  - Destination: a LOCATION selector (warehouse areas + project job_site)
+ *  - PDF upload or manual entry
  */
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../../lib/supabase'
-import { useAppConfig } from '../../../hooks/useAppConfig'
+import { useLocations } from '../../inventory/hooks/useLocations'
 import { PdfDropZone } from './PdfDropZone'
 import { useParsePdf } from '../hooks/useParsePdf'
 import type { Project } from '../../../types/project'
-import type { DestinationType, ParsedPackingItem, ReceivingLineItem } from '../types'
+import type { ParsedPackingItem, ReceivingLineItem } from '../types'
 
-interface ReceiptHeaderFormProps {
-  vendor: string
-  setVendor: (v: string) => void
-  poNumber: string
-  setPoNumber: (v: string) => void
-  dateReceived: string
-  setDateReceived: (v: string) => void
-  destinationType: DestinationType
-  setDestinationType: (v: DestinationType) => void
-  selectedProjectId: number | null
-  setSelectedProjectId: (v: number | null) => void
-  destinationFolderId: number | null
-  setDestinationFolderId: (v: number | null) => void
-  projectName: string | null
-  setProjectName: (v: string | null) => void
-  notes: string
-  setNotes: (v: string) => void
-  onItemsParsed: (items: ReceivingLineItem[]) => void
-  onManualEntry: () => void
-  onNext: () => void
+// ── Local query hooks ─────────────────────────────────────────────────────────
+
+interface VendorOption {
+  id: number
+  name: string
+}
+
+function useVendorOptions() {
+  return useQuery({
+    queryKey: ['form', 'vendors'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('vendors')
+        .select('id, name')
+        .eq('is_active', true)
+        .order('name')
+      if (error) throw error
+      return (data || []) as VendorOption[]
+    },
+    staleTime: 5 * 60 * 1000,
+  })
+}
+
+interface POOption {
+  id: number
+  po_number: string
+  vendor_id: number
+  project_id: number
+  vendor?: { name: string }
+  project?: { name: string }
+}
+
+function usePOOptions(projectId: number | null) {
+  return useQuery({
+    queryKey: ['form', 'po-options', projectId],
+    queryFn: async () => {
+      let q = supabase
+        .from('purchase_orders')
+        .select('id, po_number, vendor_id, project_id, vendor:vendors(name), project:projects(name)')
+        .in('status', ['confirmed', 'partially_received'])
+        .order('po_number')
+      if (projectId) {
+        q = q.eq('project_id', projectId)
+      }
+      const { data, error } = await q
+      if (error) throw error
+      return (data || []) as unknown as POOption[]
+    },
+    staleTime: 2 * 60 * 1000,
+  })
 }
 
 function useProjects() {
@@ -50,42 +85,125 @@ function useProjects() {
   })
 }
 
+// ── Props ─────────────────────────────────────────────────────────────────────
+
+interface ReceiptHeaderFormProps {
+  vendor: string
+  setVendor: (v: string) => void
+  vendorId: number | null
+  setVendorId: (v: number | null) => void
+  poId: number | null
+  setPoId: (v: number | null) => void
+  poNumber: string
+  setPoNumber: (v: string) => void
+  dateReceived: string
+  setDateReceived: (v: string) => void
+  selectedProjectId: number | null
+  setSelectedProjectId: (v: number | null) => void
+  projectName: string | null
+  setProjectName: (v: string | null) => void
+  destinationLocationId: number | null
+  setDestinationLocationId: (v: number | null) => void
+  destinationLocationName: string | null
+  setDestinationLocationName: (v: string | null) => void
+  notes: string
+  setNotes: (v: string) => void
+  onItemsParsed: (items: ReceivingLineItem[]) => void
+  onManualEntry: () => void
+  onNext: () => void
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
+
 export function ReceiptHeaderForm({
   vendor,
   setVendor,
+  vendorId,
+  setVendorId,
+  poId,
+  setPoId,
   poNumber,
   setPoNumber,
   dateReceived,
   setDateReceived,
-  destinationType,
-  setDestinationType,
   selectedProjectId,
   setSelectedProjectId,
-  destinationFolderId,
-  setDestinationFolderId,
   setProjectName,
+  destinationLocationId,
+  setDestinationLocationId,
+  destinationLocationName,
+  setDestinationLocationName,
   notes,
   setNotes,
   onItemsParsed,
   onManualEntry,
   onNext,
 }: ReceiptHeaderFormProps) {
+  const [vendorMode, setVendorMode] = useState<'select' | 'freetext'>('select')
+
+  const { data: vendors = [], isLoading: vendorsLoading } = useVendorOptions()
   const { data: projects = [], isLoading: projectsLoading } = useProjects()
-  const { data: appConfig } = useAppConfig()
+  const { data: poOptions = [], isLoading: posLoading } = usePOOptions(selectedProjectId)
+  const { data: warehouseLocations = [], isLoading: locationsLoading } = useLocations({ type: 'warehouse_area' })
+  const { data: jobSiteLocations = [] } = useLocations({ type: 'job_site' })
+
   const pdfHook = useParsePdf()
 
-  const handleProjectChange = (projectId: string) => {
-    if (!projectId) {
-      setSelectedProjectId(null)
-      setDestinationFolderId(null)
-      setProjectName(null)
+  // When a PO is selected, pre-fill vendor + project
+  const handlePoChange = (poIdStr: string) => {
+    if (!poIdStr) {
+      setPoId(null)
+      setPoNumber('')
       return
     }
-    const project = projects.find((p) => p.id === Number(projectId))
-    if (project) {
-      setSelectedProjectId(project.id)
-      setDestinationFolderId(project.sortly_warehouse_folder_id || null)
-      setProjectName(project.name)
+    const po = poOptions.find((p) => String(p.id) === poIdStr)
+    if (!po) return
+    setPoId(po.id)
+    setPoNumber(po.po_number)
+    // Pre-fill vendor
+    const v = vendors.find((v) => v.id === po.vendor_id)
+    if (v) {
+      setVendorId(v.id)
+      setVendor(v.name)
+    }
+    // Pre-fill project
+    const proj = projects.find((p) => p.id === po.project_id)
+    if (proj) {
+      setSelectedProjectId(proj.id)
+      setProjectName(proj.name)
+      // Try to pre-fill job site location for that project
+      const jobSite = jobSiteLocations.find((l) => l.name.toLowerCase().includes(proj.name.toLowerCase()))
+      if (jobSite) {
+        setDestinationLocationId(jobSite.id)
+        setDestinationLocationName(jobSite.name)
+      }
+    }
+  }
+
+  const handleVendorSelect = (vendorIdStr: string) => {
+    if (!vendorIdStr) {
+      setVendorId(null)
+      setVendor('')
+      return
+    }
+    const v = vendors.find((v) => String(v.id) === vendorIdStr)
+    if (v) {
+      setVendorId(v.id)
+      setVendor(v.name)
+    }
+  }
+
+  const handleLocationChange = (locationIdStr: string) => {
+    if (!locationIdStr) {
+      setDestinationLocationId(null)
+      setDestinationLocationName(null)
+      return
+    }
+    const allLocations = [...warehouseLocations, ...jobSiteLocations]
+    const loc = allLocations.find((l) => String(l.id) === locationIdStr)
+    if (loc) {
+      setDestinationLocationId(loc.id)
+      setDestinationLocationName(loc.name)
     }
   }
 
@@ -100,13 +218,14 @@ export function ReceiptHeaderForm({
       quantity_received: item.quantity_shipped,
       confidence: item.confidence,
       action: 'pending',
-      sortly_item_id: null,
-      sortly_item_name: null,
-      sortly_current_quantity: null,
-      destination_folder_id: destinationFolderId,
-      destination_folder_name: null,
+      item_id: null,
+      item_name_linked: null,
+      current_stock_quantity: null,
+      po_line_item_id: null,
+      po_line_suggestion: null,
+      destination_location_id: destinationLocationId,
+      destination_location_name: destinationLocationName,
       notes: null,
-      tags: [],
     }))
     onItemsParsed(lineItems)
     onNext()
@@ -117,20 +236,91 @@ export function ReceiptHeaderForm({
     onNext()
   }
 
-  const canProceed = vendor.trim() && dateReceived && destinationFolderId
+  const canProceed = vendor.trim() && dateReceived && destinationLocationId
+
+  const allLocations = [
+    ...warehouseLocations.map((l) => ({ ...l, group: 'Warehouse Areas' })),
+    ...jobSiteLocations.map((l) => ({ ...l, group: 'Job Sites' })),
+  ]
 
   return (
     <div className="space-y-5">
-      {/* Row 1: Vendor, PO, Date */}
+      {/* Row 1: PO Link */}
+      <FormField label="Link to Purchase Order">
+        {posLoading ? (
+          <span className="loading loading-spinner loading-sm" />
+        ) : (
+          <select
+            className="form-input"
+            value={poId ?? ''}
+            onChange={(e) => handlePoChange(e.target.value)}
+          >
+            <option value="">No PO — miscellaneous stock</option>
+            {poOptions.map((po) => (
+              <option key={po.id} value={po.id}>
+                {po.po_number}
+                {po.vendor?.name ? ` — ${po.vendor.name}` : ''}
+                {po.project?.name ? ` — ${po.project.name}` : ''}
+              </option>
+            ))}
+          </select>
+        )}
+        {poId && (
+          <p className="text-xs text-[var(--muted)] mt-1">
+            Vendor and project have been pre-filled from this PO. Received quantities will be tracked against PO lines.
+          </p>
+        )}
+      </FormField>
+
+      {/* Row 2: Vendor, PO Number, Date */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <FormField label="Vendor / Brand" required>
-          <input
-            className="form-input"
-            placeholder="Vendor name..."
-            value={vendor}
-            onChange={(e) => setVendor(e.target.value)}
-          />
+          <div className="flex gap-2">
+            {vendorMode === 'select' ? (
+              <>
+                {vendorsLoading ? (
+                  <span className="loading loading-spinner loading-sm" />
+                ) : (
+                  <select
+                    className="form-input flex-1"
+                    value={vendorId ?? ''}
+                    onChange={(e) => handleVendorSelect(e.target.value)}
+                  >
+                    <option value="">Select vendor...</option>
+                    {vendors.map((v) => (
+                      <option key={v.id} value={v.id}>{v.name}</option>
+                    ))}
+                  </select>
+                )}
+                <button
+                  type="button"
+                  onClick={() => { setVendorMode('freetext'); setVendorId(null) }}
+                  className="text-xs text-[var(--muted)] hover:text-[var(--signal)] shrink-0 whitespace-nowrap"
+                  title="Type a vendor name not in the list"
+                >
+                  Free text
+                </button>
+              </>
+            ) : (
+              <>
+                <input
+                  className="form-input flex-1"
+                  placeholder="Vendor name..."
+                  value={vendor}
+                  onChange={(e) => { setVendor(e.target.value); setVendorId(null) }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setVendorMode('select')}
+                  className="text-xs text-[var(--muted)] hover:text-[var(--signal)] shrink-0 whitespace-nowrap"
+                >
+                  Select
+                </button>
+              </>
+            )}
+          </div>
         </FormField>
+
         <FormField label="PO Number">
           <input
             className="form-input"
@@ -139,6 +329,7 @@ export function ReceiptHeaderForm({
             onChange={(e) => setPoNumber(e.target.value)}
           />
         </FormField>
+
         <FormField label="Date Received" required>
           <input
             type="date"
@@ -149,62 +340,65 @@ export function ReceiptHeaderForm({
         </FormField>
       </div>
 
-      {/* Row 2: Destination */}
-      <FormField label="Destination">
-        <div className="flex gap-2 mb-3">
-          {(['project', 'warehouse'] as const).map((type) => (
-            <button
-              key={type}
-              onClick={() => {
-                setDestinationType(type)
-                setSelectedProjectId(null)
-                setDestinationFolderId(
-                  type === 'warehouse' ? (appConfig?.mainWarehouseFolderId ?? null) : null
-                )
-                setProjectName(null)
-              }}
-              className="px-3.5 py-1.5 rounded-md text-sm font-medium transition-colors"
-              style={{
-                background: destinationType === type ? 'var(--panel-2)' : 'transparent',
-                color: destinationType === type ? 'var(--ink)' : 'var(--muted)',
-                border: `1px solid ${destinationType === type ? 'var(--line)' : 'transparent'}`,
-              }}
-            >
-              {type === 'project' ? 'Project' : 'Main Warehouse'}
-            </button>
-          ))}
-        </div>
-
-        {destinationType === 'project' ? (
-          projectsLoading ? (
+      {/* Row 3: Project + Destination Location */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <FormField label="Project">
+          {projectsLoading ? (
             <span className="loading loading-spinner loading-sm" />
           ) : (
             <select
               className="form-input"
               value={selectedProjectId ?? ''}
-              onChange={(e) => handleProjectChange(e.target.value)}
+              onChange={(e) => {
+                const pid = e.target.value ? Number(e.target.value) : null
+                const proj = projects.find((p) => p.id === pid)
+                setSelectedProjectId(pid)
+                setProjectName(proj?.name ?? null)
+              }}
             >
-              <option value="">Select a project...</option>
-              {projects
-                .filter((p) => p.sortly_warehouse_folder_id)
-                .map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
+              <option value="">No project (main warehouse)</option>
+              {projects.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
             </select>
-          )
-        ) : (
-          <div
-            className="text-sm text-[var(--muted)] px-3 py-2 rounded-md"
-            style={{ background: 'var(--panel-2)' }}
-          >
-            Items will be placed in the main warehouse. You'll link each item to a specific folder in the next step.
-          </div>
-        )}
-      </FormField>
+          )}
+        </FormField>
 
-      {/* Row 3: Notes */}
+        <FormField label="Destination Location" required>
+          {locationsLoading ? (
+            <span className="loading loading-spinner loading-sm" />
+          ) : (
+            <select
+              className="form-input"
+              value={destinationLocationId ?? ''}
+              onChange={(e) => handleLocationChange(e.target.value)}
+            >
+              <option value="">Select destination...</option>
+              {warehouseLocations.length > 0 && (
+                <optgroup label="Warehouse Areas">
+                  {warehouseLocations.map((l) => (
+                    <option key={l.id} value={l.id}>{l.name}</option>
+                  ))}
+                </optgroup>
+              )}
+              {jobSiteLocations.length > 0 && (
+                <optgroup label="Job Sites">
+                  {jobSiteLocations.map((l) => (
+                    <option key={l.id} value={l.id}>{l.name}</option>
+                  ))}
+                </optgroup>
+              )}
+            </select>
+          )}
+          {allLocations.length === 0 && !locationsLoading && (
+            <p className="text-xs text-[var(--warn)] mt-1">
+              No locations configured yet — set up warehouse areas in Inventory → Locations.
+            </p>
+          )}
+        </FormField>
+      </div>
+
+      {/* Row 4: Notes */}
       <FormField label="Notes">
         <textarea
           className="form-input"
@@ -215,7 +409,7 @@ export function ReceiptHeaderForm({
         />
       </FormField>
 
-      {/* Row 4: Input method */}
+      {/* Row 5: Input method */}
       {canProceed && (
         <div>
           <FieldLabel label="Add items" />
@@ -226,7 +420,6 @@ export function ReceiptHeaderForm({
               error={pdfHook.error}
               onParse={(file) => pdfHook.parsePdf(file, vendor, poNumber)}
             />
-            {/* B1+B2: Equal-weight sibling card; clipboard icon implies "list of items" */}
             <button
               onClick={handleManualEntry}
               className="rounded-xl text-center py-8 px-6 cursor-pointer transition-colors group"

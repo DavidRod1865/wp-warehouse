@@ -136,6 +136,17 @@ export default function PoDetailPage() {
   const lineItems = po.line_items || []
   const receivedCount = lineItems.filter((l: any) => l.received_status === 'received').length
 
+  const computedLineTotal = lineItems.reduce((sum: number, line: any) => {
+    if (line.unit_price == null) return sum
+    return sum + Number(line.unit_price) * Number(line.quantity_ordered)
+  }, 0)
+  const hasLinePrices = lineItems.some((l: any) => l.unit_price != null)
+  const lumpSum =
+    po.lump_sum_amount != null ? Number(po.lump_sum_amount) : null
+
+  const formatMoney = (n: number) =>
+    n.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
+
   return (
     <div className="p-6 max-w-[1200px] mx-auto">
       {/* Back Button */}
@@ -234,6 +245,19 @@ export default function PoDetailPage() {
           </div>
         </div>
 
+        {(lumpSum != null || hasLinePrices) && (
+          <div className="mt-4 pt-4 border-t border-[var(--line)]">
+            <div className="text-xs text-[var(--muted)] uppercase mb-1" style={{ fontFamily: 'var(--mono)' }}>
+              {lumpSum != null ? 'Lump sum' : 'Line total'}
+            </div>
+            <div className="text-lg font-medium text-[var(--ink)]">
+              {lumpSum != null
+                ? formatMoney(lumpSum)
+                : formatMoney(computedLineTotal)}
+            </div>
+          </div>
+        )}
+
         {po.notes && (
           <div className="mt-4 pt-4 border-t border-[var(--line)]">
             <div className="text-xs text-[var(--muted)] uppercase mb-2" style={{ fontFamily: 'var(--mono)' }}>
@@ -259,8 +283,13 @@ export default function PoDetailPage() {
 
       {/* Line Items Table */}
       <div className="bg-[var(--panel)] rounded-xl border border-[var(--line)] overflow-hidden">
-        <div className="p-4 border-b border-[var(--line)] bg-[var(--panel-2)]">
+        <div className="p-4 border-b border-[var(--line)] bg-[var(--panel-2)] flex items-center justify-between gap-4">
           <h2 className="text-lg font-semibold text-[var(--ink)]">Line Items</h2>
+          {lumpSum != null && (
+            <span className="text-sm text-[var(--muted)]">
+              Priced as lump sum — line unit prices not set
+            </span>
+          )}
         </div>
 
         {lineItems.length === 0 ? (

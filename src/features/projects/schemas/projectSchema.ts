@@ -13,7 +13,13 @@ const projectAddressSchema = z.object({
 
 export const projectFormSchema = z.object({
   name: z.string().min(1, 'Project name is required'),
-  gc_id: z.number().optional(),
+  // preprocess turns NaN from valueAsNumber inputs into undefined; the cast
+  // restores a typed input (z.preprocess otherwise types input as unknown,
+  // which breaks zodResolver's inferred form types)
+  gc_id: z.preprocess(
+    (v) => (typeof v === 'number' && Number.isNaN(v) ? undefined : v),
+    z.number().optional(),
+  ) as unknown as z.ZodOptional<z.ZodNumber>,
   project_address: projectAddressSchema,
   status: z.string().optional(),
   notes: z.string().optional(),

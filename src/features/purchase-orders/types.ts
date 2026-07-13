@@ -10,6 +10,7 @@ export interface PurchaseOrder {
   po_date: string | null // YYYY-MM-DD
   status: 'draft' | 'confirmed' | 'partially_received' | 'received' | 'cancelled'
   pdf_storage_path: string | null
+  lump_sum_amount: number | null
   notes: string | null
   created_by: string | null // UUID
   created_at: string
@@ -55,6 +56,8 @@ export interface ParsedPurchaseOrder {
   po_number: string | null
   vendor_name: string | null
   po_date: string | null // YYYY-MM-DD or null
+  /** Document grand total / lump sum when line prices are absent */
+  total_amount: number | null
   lines: ParsedPurchaseOrderLine[]
 }
 
@@ -67,6 +70,8 @@ export interface POFormData {
   vendor_id: number
   project_id: number
   po_date: string | null
+  pricing_mode?: 'per_line' | 'lump_sum'
+  lump_sum_amount: number | null
   lines: {
     line_number: number
     description: string

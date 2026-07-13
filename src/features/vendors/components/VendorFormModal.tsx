@@ -61,6 +61,7 @@ export function VendorFormModal({ vendor, onClose }: VendorFormModalProps) {
     formState: { errors },
   } = useForm<VendorFormValues>({
     resolver: zodResolver(vendorFormSchema),
+    shouldFocusError: false,
     defaultValues: {
       name: vendor?.name ?? '',
       contact_name: vendor?.contact_name ?? null,
@@ -68,6 +69,7 @@ export function VendorFormModal({ vendor, onClose }: VendorFormModalProps) {
       email: vendor?.email ?? null,
       address: vendor?.address ?? null,
       notes: vendor?.notes ?? null,
+      is_active: vendor?.is_active ?? true,
     } as VendorFormValues,
   })
 
@@ -95,19 +97,21 @@ export function VendorFormModal({ vendor, onClose }: VendorFormModalProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 grid place-items-center p-4"
+      className="fixed inset-0 z-50 overflow-y-auto overscroll-contain"
       style={{
         background: 'color-mix(in oklab, var(--ink) 35%, transparent)',
         backdropFilter: 'blur(4px)',
       }}
-      onClick={onClose}
     >
+      <div className="flex min-h-full items-start justify-center p-4 sm:items-center">
       <div
-        onClick={(e) => e.stopPropagation()}
-        className="bg-[var(--panel)] rounded-xl w-full max-w-md overflow-hidden"
-        style={{ boxShadow: '0 20px 60px -20px rgba(15,23,41,.35), 0 0 0 1px var(--line)' }}
+        className="bg-[var(--panel)] rounded-xl w-full max-w-md my-4 sm:my-0 flex flex-col"
+        style={{
+          maxHeight: 'min(900px, calc(100dvh - 32px))',
+          boxShadow: '0 20px 60px -20px rgba(15,23,41,.35), 0 0 0 1px var(--line)',
+        }}
       >
-        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-[var(--line)]">
+        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-[var(--line)] shrink-0">
           <h3 className="text-lg font-semibold">{isEdit ? 'Edit Vendor' : 'New Vendor'}</h3>
           <button
             onClick={onClose}
@@ -118,8 +122,8 @@ export function VendorFormModal({ vendor, onClose }: VendorFormModalProps) {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)}>
-          <div className="px-6 py-5 space-y-4">
+        <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col min-h-0 flex-1">
+          <div className="px-6 py-5 space-y-4 overflow-y-auto min-h-0">
             <FormField label="Vendor Name" required error={errors.name?.message}>
               <input
                 {...register('name')}
@@ -215,10 +219,20 @@ export function VendorFormModal({ vendor, onClose }: VendorFormModalProps) {
                 disabled={saving}
               />
             </FormField>
+
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                {...register('is_active')}
+                className="checkbox checkbox-sm"
+                disabled={saving}
+              />
+              <span className="text-sm text-[var(--ink)]">Active</span>
+            </label>
           </div>
 
           <div
-            className="flex justify-end gap-2 px-6 py-3.5 border-t border-[var(--line)]"
+            className="flex justify-end gap-2 px-6 py-3.5 border-t border-[var(--line)] shrink-0"
             style={{ background: 'color-mix(in oklab, var(--panel-2) 50%, var(--panel))' }}
           >
             <button
@@ -239,6 +253,7 @@ export function VendorFormModal({ vendor, onClose }: VendorFormModalProps) {
             </button>
           </div>
         </form>
+      </div>
       </div>
     </div>
   )

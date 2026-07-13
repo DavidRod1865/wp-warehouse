@@ -3,9 +3,11 @@
  *
  * Step 1: Upload PDF or skip
  * Step 2: Review parsed data, select vendor, project, edit line items, save
+ *
+ * Pricing: exclusive modes — per-line unit prices OR a single PO lump sum.
  */
 import { useState } from 'react'
-import { useForm, Controller } from 'react-hook-form'
+import { useForm, Controller, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { poFormSchema, type POFormSchema } from '../schemas/poSchema'
 import { useParsePo } from '../hooks/useParsePo'
@@ -55,6 +57,10 @@ function FormField({
   )
 }
 
+function formatMoney(n: number) {
+  return n.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
+}
+
 /**
  * Fuzzy match vendor name: case-insensitive contains
  */
@@ -84,18 +90,39 @@ export function UploadPoModal({ onClose }: UploadPoModalProps) {
     formState: { errors, isSubmitting },
   } = useForm<POFormSchema>({
     resolver: zodResolver(poFormSchema),
+    shouldFocusError: false,
     defaultValues: {
       po_number: '',
       vendor_id: 0,
       project_id: 0,
       po_date: null,
+      pricing_mode: 'per_line',
+      lump_sum_amount: null,
       lines: [],
       notes: null,
     },
   })
 
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: 'lines',
+  })
+
   const vendorId = watch('vendor_id')
   const lines = watch('lines')
+  const pricingMode = watch('pricing_mode')
+  const lumpSumAmount = watch('lump_sum_amount')
+
+  const lineTotal = (lines ?? []).reduce((sum, line) => {
+    const price = line.unit_price
+    const qty = line.quantity_ordered
+    if (price == null || Number.isNaN(price) || !qty || Number.isNaN(qty)) return sum
+    return sum + price * qty
+  }, 0)
+
+  const hasAnyLinePrice = (lines ?? []).some(
+    (l) => l.unit_price != null && !Number.isNaN(l.unit_price)
+  )
 
   // Create a vendor directly from the parsed PDF name when no match exists
   const createVendor = useCreateVendor()
@@ -104,7 +131,7 @@ export function UploadPoModal({ onClose }: UploadPoModalProps) {
     if (!parsedPo?.vendor_name) return
     setCreatingVendor(true)
     try {
-      const vendor = await createVendor.mutateAsync({ name: parsedPo.vendor_name })
+      const vendor = await createVendor.mutateAsync({ name: parsedPo.vendor_name, is_active: true })
       setValue('vendor_id', Number(vendor.id), { shouldValidate: true })
       toast(`Vendor "${parsedPo.vendor_name}" created`)
     } catch (err) {
@@ -146,6 +173,19 @@ export function UploadPoModal({ onClose }: UploadPoModalProps) {
         }))
       )
 
+      // Pricing mode from PDF: per-line if any unit prices; else lump sum if total present
+      const anyLinePrice = parsed.lines.some((l) => l.unit_price != null)
+      if (anyLinePrice) {
+        setValue('pricing_mode', 'per_line')
+        setValue('lump_sum_amount', null)
+      } else if (parsed.total_amount != null && parsed.total_amount > 0) {
+        setValue('pricing_mode', 'lump_sum')
+        setValue('lump_sum_amount', parsed.total_amount)
+      } else {
+        setValue('pricing_mode', 'per_line')
+        setValue('lump_sum_amount', null)
+      }
+
       setStep('review')
     } catch (err) {
       toast(
@@ -156,6 +196,8 @@ export function UploadPoModal({ onClose }: UploadPoModalProps) {
   }
 
   const handleSkipPdf = () => {
+    setValue('pricing_mode', 'per_line')
+    setValue('lump_sum_amount', null)
     setValue('lines', [
       {
         line_number: 1,
@@ -169,6 +211,29 @@ export function UploadPoModal({ onClose }: UploadPoModalProps) {
     setStep('review')
   }
 
+  const handleAddLine = () => {
+    append({
+      line_number: (lines?.length ?? 0) + 1,
+      description: '',
+      part_number: null,
+      quantity_ordered: 1,
+      unit_price: null,
+      notes: null,
+    })
+  }
+
+  const handleRemoveLine = (idx: number) => {
+    if ((lines?.length ?? 0) <= 1) return
+    remove(idx)
+  }
+
+  const setPricingMode = (mode: 'per_line' | 'lump_sum') => {
+    setValue('pricing_mode', mode)
+    if (mode === 'per_line') {
+      setValue('lump_sum_amount', null)
+    }
+  }
+
   // Step 2: Save PO
   const onSubmit = async (data: POFormSchema) => {
     try {
@@ -179,8 +244,20 @@ export function UploadPoModal({ onClose }: UploadPoModalProps) {
         storagePath = await uploadPoFile(selectedFile, data.po_number)
       }
 
+      const lines = data.lines.map((line, i) => ({
+        ...line,
+        line_number: i + 1,
+      }))
+
       await createPo.mutateAsync({
-        ...data,
+        po_number: data.po_number,
+        vendor_id: data.vendor_id,
+        project_id: data.project_id,
+        po_date: data.po_date || null,
+        pricing_mode: data.pricing_mode,
+        lump_sum_amount: data.lump_sum_amount ?? null,
+        lines,
+        notes: data.notes,
         pdf_storage_path: storagePath,
       })
 
@@ -194,15 +271,15 @@ export function UploadPoModal({ onClose }: UploadPoModalProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
-      onClick={onClose}
+      className="fixed inset-0 z-50 overflow-y-auto overscroll-contain bg-black/40"
     >
+      <div className="flex min-h-full items-start justify-center p-4 sm:items-center">
       <div
-        className="bg-[var(--panel)] rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
-        onClick={(e) => e.stopPropagation()}
+        className="bg-[var(--panel)] rounded-2xl shadow-2xl w-full max-w-2xl my-4 sm:my-0 flex flex-col"
+        style={{ maxHeight: 'min(900px, calc(100dvh - 32px))' }}
       >
         {/* Header */}
-        <div className="sticky top-0 bg-[var(--panel)] border-b border-[var(--line)] p-6 flex items-center justify-between">
+        <div className="sticky top-0 bg-[var(--panel)] border-b border-[var(--line)] p-6 flex items-center justify-between shrink-0">
           <h2 className="text-xl font-semibold text-[var(--ink)]">
             {step === 'upload' ? 'Upload Purchase Order' : 'Review Purchase Order'}
           </h2>
@@ -210,12 +287,12 @@ export function UploadPoModal({ onClose }: UploadPoModalProps) {
             onClick={onClose}
             className="text-[var(--muted)] hover:text-[var(--ink)] transition-colors"
           >
-            <Icon name="x" className="w-5 h-5" />
+            <Icon name="close" className="w-5 h-5" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="p-6">
+        <div className="p-6 overflow-y-auto min-h-0">
           {step === 'upload' ? (
             // Step 1: Upload
             <div className="space-y-6">
@@ -248,7 +325,7 @@ export function UploadPoModal({ onClose }: UploadPoModalProps) {
             </div>
           ) : (
             // Step 2: Review form
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+            <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5">
               {/* PO Number */}
               <FormField label="PO Number" required error={errors.po_number?.message}>
                 <input
@@ -316,6 +393,82 @@ export function UploadPoModal({ onClose }: UploadPoModalProps) {
                 />
               </FormField>
 
+              {/* Pricing mode */}
+              <div>
+                <div
+                  className="mb-2 text-[var(--muted)] uppercase"
+                  style={{
+                    fontFamily: 'var(--mono)',
+                    fontSize: 10.5,
+                    letterSpacing: '.08em',
+                  }}
+                >
+                  Pricing
+                </div>
+                <div
+                  className="inline-flex rounded-lg border border-[var(--line)] p-0.5"
+                  role="group"
+                  aria-label="Pricing mode"
+                >
+                  <button
+                    type="button"
+                    onClick={() => setPricingMode('per_line')}
+                    className="px-3 py-1.5 rounded-md text-sm font-medium transition-colors"
+                    style={{
+                      background:
+                        pricingMode === 'per_line'
+                          ? 'color-mix(in oklab, var(--signal) 18%, var(--panel))'
+                          : 'transparent',
+                      color:
+                        pricingMode === 'per_line' ? 'var(--signal)' : 'var(--muted)',
+                    }}
+                  >
+                    Per-line prices
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPricingMode('lump_sum')}
+                    className="px-3 py-1.5 rounded-md text-sm font-medium transition-colors"
+                    style={{
+                      background:
+                        pricingMode === 'lump_sum'
+                          ? 'color-mix(in oklab, var(--signal) 18%, var(--panel))'
+                          : 'transparent',
+                      color:
+                        pricingMode === 'lump_sum' ? 'var(--signal)' : 'var(--muted)',
+                    }}
+                  >
+                    Lump sum
+                  </button>
+                </div>
+                <p className="mt-1.5 text-xs text-[var(--muted)]">
+                  {pricingMode === 'per_line'
+                    ? 'Enter a unit price on each line when the vendor prices items individually.'
+                    : 'Use when the vendor quotes a single total instead of per-line prices.'}
+                </p>
+              </div>
+
+              {pricingMode === 'lump_sum' && (
+                <FormField
+                  label="PO total (lump sum)"
+                  error={errors.lump_sum_amount?.message}
+                >
+                  <div className="form-input flex items-center gap-1.5 !py-0 !px-0 overflow-hidden">
+                    <span className="pl-3 text-[var(--muted)] text-sm shrink-0 select-none">
+                      $
+                    </span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="0.00"
+                      className="flex-1 min-w-0 bg-transparent border-0 outline-none py-[9px] pr-3 text-[var(--ink)]"
+                      {...register('lump_sum_amount', { valueAsNumber: true })}
+                    />
+                  </div>
+                </FormField>
+              )}
+
               {/* Line Items */}
               <div>
                 <div className="flex items-center justify-between mb-3">
@@ -329,55 +482,120 @@ export function UploadPoModal({ onClose }: UploadPoModalProps) {
                   >
                     Line Items <span className="text-[var(--danger)]">*</span>
                   </label>
+                  <button
+                    type="button"
+                    onClick={handleAddLine}
+                    className="inline-flex items-center gap-1 text-xs font-medium text-[var(--signal)] hover:underline"
+                  >
+                    <Icon name="plus" className="w-3.5 h-3.5" />
+                    Add line
+                  </button>
                 </div>
 
                 <div className="space-y-3">
-                  {lines.map((_, idx) => (
+                  {fields.map((field, idx) => (
                     <div
-                      key={idx}
+                      key={field.id}
                       className="p-3 rounded-lg border border-[var(--line)] bg-[var(--panel-2)]"
                     >
-                      <div className="grid grid-cols-12 gap-2">
-                        <input
-                          type="text"
-                          placeholder="Description"
-                          className="form-input col-span-6 text-sm"
-                          {...register(`lines.${idx}.description`)}
-                        />
-                        <input
-                          type="text"
-                          placeholder="Part #"
-                          className="form-input col-span-3 text-sm"
-                          {...register(`lines.${idx}.part_number`)}
-                        />
-                        <input
-                          type="number"
-                          placeholder="Qty"
-                          className="form-input col-span-3 text-sm"
-                          {...register(`lines.${idx}.quantity_ordered`, {
-                            valueAsNumber: true,
-                          })}
-                        />
+                      <div className="flex items-start gap-2">
+                        <div className="flex-1 min-w-0 space-y-2">
+                          <div className="grid grid-cols-12 gap-2">
+                            <input
+                              type="text"
+                              placeholder="Description"
+                              className="form-input col-span-7 text-sm"
+                              {...register(`lines.${idx}.description`)}
+                            />
+                            <input
+                              type="text"
+                              placeholder="Part #"
+                              className="form-input col-span-5 text-sm"
+                              {...register(`lines.${idx}.part_number`)}
+                            />
+                          </div>
+                          <div className="grid grid-cols-12 gap-2">
+                            <input
+                              type="number"
+                              placeholder="Qty"
+                              className="form-input col-span-4 text-sm"
+                              {...register(`lines.${idx}.quantity_ordered`, {
+                                valueAsNumber: true,
+                              })}
+                            />
+                            {pricingMode === 'per_line' && (
+                              <div className="col-span-8 form-input flex items-center gap-1.5 !py-0 !px-0 overflow-hidden text-sm">
+                                <span className="pl-3 text-[var(--muted)] text-sm shrink-0 select-none">
+                                  $
+                                </span>
+                                <input
+                                  type="number"
+                                  placeholder="Unit price"
+                                  step="0.01"
+                                  className="flex-1 min-w-0 bg-transparent border-0 outline-none py-[9px] pr-3 text-[var(--ink)]"
+                                  {...register(`lines.${idx}.unit_price`, {
+                                    valueAsNumber: true,
+                                  })}
+                                />
+                              </div>
+                            )}
+                            {pricingMode === 'lump_sum' && (
+                              <div className="col-span-8 flex items-center text-xs text-[var(--muted)] px-1">
+                                Priced via lump sum
+                              </div>
+                            )}
+                          </div>
+                          {errors.lines?.[idx]?.description && (
+                            <div className="text-xs" style={{ color: 'var(--danger)' }}>
+                              {errors.lines[idx]?.description?.message}
+                            </div>
+                          )}
+                        </div>
+                        {fields.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveLine(idx)}
+                            className="shrink-0 p-1.5 rounded-md text-[var(--muted)] hover:text-[var(--danger)] hover:bg-[var(--panel)]"
+                            aria-label="Remove line"
+                          >
+                            <Icon name="close" className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                       <input
-                        type="number"
-                        placeholder="Unit Price"
-                        step="0.01"
-                        className="form-input w-full text-sm mt-2"
-                        {...register(`lines.${idx}.unit_price`, {
-                          valueAsNumber: true,
-                        })}
+                        type="hidden"
+                        {...register(`lines.${idx}.line_number`, { valueAsNumber: true })}
                       />
                     </div>
                   ))}
                 </div>
 
-                {errors.lines && (
+                {errors.lines && typeof errors.lines.message === 'string' && (
                   <div className="mt-1 text-xs" style={{ color: 'var(--danger)' }}>
-                    {typeof errors.lines.message === 'string' &&
-                      errors.lines.message}
+                    {errors.lines.message}
                   </div>
                 )}
+
+                {/* Pricing summary */}
+                <div className="mt-3 flex justify-end text-sm">
+                  {pricingMode === 'lump_sum' ? (
+                    <span className="text-[var(--ink-2)]">
+                      Lump sum:{' '}
+                      <b className="text-[var(--ink)]">
+                        {lumpSumAmount != null && !Number.isNaN(lumpSumAmount)
+                          ? formatMoney(lumpSumAmount)
+                          : '—'}
+                      </b>
+                    </span>
+                  ) : (
+                    <span className="text-[var(--ink-2)]">
+                      Line total:{' '}
+                      <b className="text-[var(--ink)]">
+                        {hasAnyLinePrice ? formatMoney(lineTotal) : '—'}
+                      </b>
+                    </span>
+                  )}
+                </div>
               </div>
 
               {/* Notes */}
@@ -411,6 +629,7 @@ export function UploadPoModal({ onClose }: UploadPoModalProps) {
             </form>
           )}
         </div>
+      </div>
       </div>
     </div>
   )

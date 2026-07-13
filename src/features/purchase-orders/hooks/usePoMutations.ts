@@ -14,6 +14,10 @@ export function useCreatePo() {
 
   return useMutation({
     mutationFn: async (data: POFormData & { pdf_storage_path?: string }) => {
+      const pricingMode = data.pricing_mode ?? 'per_line'
+      const lumpSum =
+        pricingMode === 'lump_sum' ? data.lump_sum_amount ?? null : null
+
       // Insert the PO (vendor_id comes as number from form but needs to be sent to DB)
       const { data: po, error: poError } = await supabase
         .from('purchase_orders')
@@ -23,6 +27,7 @@ export function useCreatePo() {
           project_id: data.project_id,
           po_date: data.po_date,
           pdf_storage_path: data.pdf_storage_path || null,
+          lump_sum_amount: lumpSum,
           notes: data.notes,
         })
         .select()
@@ -36,7 +41,7 @@ export function useCreatePo() {
         throw poError
       }
 
-      // Insert line items
+      // Insert line items — clear unit prices in lump-sum mode
       const { error: linesError } = await supabase
         .from('po_line_items')
         .insert(
@@ -46,7 +51,7 @@ export function useCreatePo() {
             description: line.description,
             part_number: line.part_number,
             quantity_ordered: line.quantity_ordered,
-            unit_price: line.unit_price,
+            unit_price: pricingMode === 'lump_sum' ? null : line.unit_price,
             notes: line.notes,
           }))
         )

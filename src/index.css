@@ -140,6 +140,16 @@
   filter: invert(1);
 }
 
+/* View toggle active state — blue in light, gold in dark */
+.view-toggle-active {
+  background: color-mix(in oklab, var(--info) 24%, var(--panel));
+  color: var(--info);
+}
+[data-theme="withpride-dark"] .view-toggle-active {
+  background: color-mix(in oklab, var(--signal) 24%, var(--panel));
+  color: var(--signal);
+}
+
 /* ── Base styles ────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; }
 html, body {

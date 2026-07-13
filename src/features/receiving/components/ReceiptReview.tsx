@@ -1,21 +1,27 @@
 /**
- * ReceiptReview — Step 3 of the receiving workflow
+ * ReceiptReview — Step 3 of the receiving workflow (Phase 4)
  *
- * Summary table of all items, action badges, quantity changes.
- * Confirm button triggers the Sortly + Supabase mutation.
+ * Summary includes:
+ *  - Destination location (not Sortly folder)
+ *  - PO progress preview (if PO linked)
+ *  - Per-item: PO line ordered/received-after-this, action badge
+ *
+ * Confirm → confirm_receipt RPC (atomic: stock + PO + ledger).
  */
 import { useState } from 'react'
 import { Icon } from '../../../components/ui/Icon'
 import { useConfirmReceipt } from '../hooks/useReceivingMutations'
 import { ACTION_STYLES } from '../utils/actionStyles'
-import type { ReceivingLineItem, DestinationType, ConfirmReceiptParams } from '../types'
+import type { ReceivingLineItem, ConfirmReceiptParams } from '../types'
 
 interface ReceiptReviewProps {
   vendor: string
+  vendorId: number | null
+  poId: number | null
   poNumber: string
   dateReceived: string
-  destinationType: DestinationType
-  destinationFolderId: number | null
+  destinationLocationId: number | null
+  destinationLocationName: string | null
   projectId: number | null
   projectName: string | null
   notes: string
@@ -26,10 +32,12 @@ interface ReceiptReviewProps {
 
 export function ReceiptReview({
   vendor,
+  vendorId,
+  poId,
   poNumber,
   dateReceived,
-  destinationType,
-  destinationFolderId,
+  destinationLocationId,
+  destinationLocationName,
   projectId,
   projectName,
   notes,
@@ -40,30 +48,29 @@ export function ReceiptReview({
   const [progressMsg, setProgressMsg] = useState<string | null>(null)
   const confirmMutation = useConfirmReceipt(setProgressMsg)
 
-  const activeItems = items.filter((i) => i.action !== 'skip')
+  const activeItems = items.filter((i) => i.action !== 'skip' && i.action !== 'pending')
   const updateItems = activeItems.filter((i) => i.action === 'update')
   const createItems = activeItems.filter((i) => i.action === 'create')
   const skippedItems = items.filter((i) => i.action === 'skip')
-  const pendingItems = activeItems.filter((i) => i.action === 'pending')
+  const pendingItems = items.filter((i) => i.action === 'pending')
 
-  const destinationNames = new Set(
-    activeItems.map((i) => i.destination_folder_name).filter(Boolean)
-  )
-  const destinationLabel = destinationNames.size === 1
-    ? [...destinationNames][0]!
-    : destinationNames.size > 1
-      ? 'Multiple destinations'
-      : (projectName || 'Main Warehouse')
+  // PO progress summary
+  const poLinkedItems = activeItems.filter((i) => i.po_line_suggestion != null)
+  const poTotalOrdered = poLinkedItems.reduce((s, i) => s + (i.po_line_suggestion?.quantity_ordered ?? 0), 0)
+  const poTotalAlreadyReceived = poLinkedItems.reduce((s, i) => s + (i.po_line_suggestion?.quantity_already_received ?? 0), 0)
+  const poTotalAfterThis = poTotalAlreadyReceived + poLinkedItems.reduce((s, i) => s + i.quantity_received, 0)
 
   const handleConfirm = async () => {
-    if (!destinationFolderId) return
+    if (!destinationLocationId) return
 
     const params: ConfirmReceiptParams = {
       vendor,
+      vendor_id: vendorId,
+      po_id: poId,
       po_number: poNumber || null,
       date_received: dateReceived,
-      destination_type: destinationType,
-      destination_folder_id: destinationFolderId,
+      destination_type: projectId ? 'project' : 'warehouse',
+      destination_location_id: destinationLocationId,
       project_name: projectName,
       project_id: projectId,
       notes: notes || null,
@@ -79,46 +86,76 @@ export function ReceiptReview({
   }
 
   const isProcessing = confirmMutation.isPending
+  const canConfirm = !isProcessing && activeItems.length > 0 && !!destinationLocationId
 
   return (
     <div className="space-y-5">
       {/* Header summary */}
       <div className="rounded-lg border border-[var(--line)] bg-[var(--panel-2)] p-4">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-          <div>
-            <span className="text-[var(--muted)]" style={{ fontFamily: 'var(--mono)', fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '.06em' }}>
-              Vendor
-            </span>
-            <div className="font-medium text-[var(--ink)] mt-0.5">{vendor}</div>
-          </div>
-          {poNumber && (
-            <div>
-              <span className="text-[var(--muted)]" style={{ fontFamily: 'var(--mono)', fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '.06em' }}>
-                PO Number
-              </span>
-              <div className="font-medium text-[var(--ink)] mt-0.5">{poNumber}</div>
-            </div>
-          )}
-          <div>
-            <span className="text-[var(--muted)]" style={{ fontFamily: 'var(--mono)', fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '.06em' }}>
-              Date Received
-            </span>
-            <div className="font-medium text-[var(--ink)] mt-0.5">
-              {new Date(dateReceived + 'T00:00').toLocaleDateString('en-US', {
-                month: 'short', day: 'numeric', year: 'numeric',
-              })}
-            </div>
-          </div>
-          <div>
-            <span className="text-[var(--muted)]" style={{ fontFamily: 'var(--mono)', fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '.06em' }}>
-              Destination
-            </span>
-            <div className="font-medium text-[var(--ink)] mt-0.5">
-              {destinationLabel}
-            </div>
-          </div>
+          <SummaryField label="Vendor" value={vendor} />
+          {poNumber && <SummaryField label="PO Number" value={poNumber} />}
+          <SummaryField
+            label="Date Received"
+            value={new Date(dateReceived + 'T00:00').toLocaleDateString('en-US', {
+              month: 'short', day: 'numeric', year: 'numeric',
+            })}
+          />
+          <SummaryField
+            label="Destination"
+            value={destinationLocationName ?? '—'}
+          />
+          {projectName && <SummaryField label="Project" value={projectName} />}
         </div>
       </div>
+
+      {/* PO progress preview (only when PO linked) */}
+      {poId && poLinkedItems.length > 0 && (
+        <div className="rounded-lg border border-[var(--line)] bg-[var(--panel)] p-4">
+          <div
+            className="text-[var(--muted)] mb-3"
+            style={{ fontFamily: 'var(--mono)', fontSize: 10.5, letterSpacing: '.08em', textTransform: 'uppercase' }}
+          >
+            PO Progress after this receipt
+          </div>
+          <div className="flex items-center gap-4">
+            <div>
+              <span
+                className="text-2xl font-medium"
+                style={{ fontFamily: 'var(--serif)', color: 'var(--ink)' }}
+              >
+                {poTotalAfterThis}
+              </span>
+              <span className="text-sm text-[var(--muted)] ml-1">/ {poTotalOrdered} ordered</span>
+            </div>
+            {poTotalAfterThis > poTotalOrdered && (
+              <span
+                className="text-xs font-medium px-2 py-0.5 rounded"
+                style={{ background: 'var(--warn-soft)', color: 'var(--warn)' }}
+              >
+                OVER by {poTotalAfterThis - poTotalOrdered}
+              </span>
+            )}
+            {poTotalAfterThis === poTotalOrdered && (
+              <span
+                className="text-xs font-medium px-2 py-0.5 rounded"
+                style={{ background: 'var(--ok-soft)', color: 'var(--ok)' }}
+              >
+                PO will be fully received
+              </span>
+            )}
+          </div>
+          <div className="mt-2 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--line)' }}>
+            <div
+              className="h-full rounded-full transition-all"
+              style={{
+                width: `${Math.min(100, (poTotalAfterThis / Math.max(poTotalOrdered, 1)) * 100)}%`,
+                background: poTotalAfterThis > poTotalOrdered ? 'var(--warn)' : 'var(--ok)',
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="flex gap-3 flex-wrap">
@@ -132,7 +169,7 @@ export function ReceiptReview({
         )}
       </div>
 
-      {/* Warning for unlinked items */}
+      {/* Warnings */}
       {pendingItems.length > 0 && (
         <div
           className="flex items-start gap-2 px-4 py-3 rounded-lg text-sm"
@@ -140,9 +177,19 @@ export function ReceiptReview({
         >
           <Icon name="alert" className="w-4 h-4 mt-0.5 shrink-0" />
           <div>
-            <b>{pendingItems.length} item{pendingItems.length !== 1 ? 's' : ''}</b> not linked to inventory.
-            Go back to link them or they will be skipped.
+            <b>{pendingItems.length} item{pendingItems.length !== 1 ? 's' : ''}</b> not linked —
+            go back to link them or they will not be received.
           </div>
+        </div>
+      )}
+
+      {!destinationLocationId && (
+        <div
+          className="flex items-start gap-2 px-4 py-3 rounded-lg text-sm"
+          style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}
+        >
+          <Icon name="alert" className="w-4 h-4 mt-0.5 shrink-0" />
+          No destination location selected — go back to Step 1 and choose one.
         </div>
       )}
 
@@ -153,80 +200,42 @@ export function ReceiptReview({
             <thead>
               <tr
                 className="border-b border-[var(--line)] text-[var(--muted)]"
-                style={{
-                  fontFamily: 'var(--mono)',
-                  fontSize: 10.5,
-                  letterSpacing: '.06em',
-                  textTransform: 'uppercase',
-                }}
+                style={{ fontFamily: 'var(--mono)', fontSize: 10.5, letterSpacing: '.06em', textTransform: 'uppercase' }}
               >
                 <th className="text-left font-medium px-4 py-2.5">Item</th>
                 <th className="text-left font-medium px-3 py-2.5">Part #</th>
-                <th className="text-left font-medium px-3 py-2.5">Destination</th>
                 <th className="text-left font-medium px-3 py-2.5">Action</th>
-                <th className="text-right font-medium px-3 py-2.5" style={{ width: 70 }}>Ordered</th>
-                <th className="text-right font-medium px-3 py-2.5" style={{ width: 70 }}>Shipped</th>
-                <th className="text-right font-medium px-3 py-2.5" style={{ width: 50 }}>B/O</th>
-                <th className="text-right font-medium px-3 py-2.5" style={{ width: 70 }}>Current</th>
-                <th className="text-right font-medium px-3 py-2.5" style={{ width: 70 }}>New Qty</th>
+                <th className="text-right font-medium px-3 py-2.5" style={{ width: 70 }}>Received</th>
+                <th className="text-left font-medium px-3 py-2.5">PO Progress</th>
               </tr>
             </thead>
             <tbody>
               {items.map((item) => {
                 const badge = ACTION_STYLES[item.action]
-                const currentQty = item.sortly_current_quantity !== null
-                  ? Math.round(item.sortly_current_quantity)
+                const poLine = item.po_line_suggestion
+                const afterThis = poLine
+                  ? poLine.quantity_already_received + item.quantity_received
                   : null
-                const newQty = item.action === 'update' && currentQty !== null
-                  ? currentQty + item.quantity_received
-                  : item.action === 'create'
-                    ? item.quantity_received
-                    : null
 
                 return (
                   <tr
                     key={item.tempId}
                     className="border-b border-[var(--line)] last:border-0"
-                    style={{ opacity: item.action === 'skip' ? 0.4 : 1 }}
+                    style={{ opacity: item.action === 'skip' || item.action === 'pending' ? 0.4 : 1 }}
                   >
                     <td className="px-4 py-2.5">
                       <span className="font-medium text-[var(--ink)]">{item.item_name}</span>
-                      {item.tags.length > 0 && (
-                        <div className="flex gap-1 mt-1 flex-wrap">
-                          {item.tags.map((tag) => (
-                            <span
-                              key={tag}
-                              className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium"
-                              style={{ background: 'var(--panel-2)', color: 'var(--ink-2)', border: '1px solid var(--line)' }}
-                            >
-                              {tag}
-                            </span>
-                          ))}
+                      {item.item_name_linked && item.item_name_linked !== item.item_name && (
+                        <div
+                          className="text-xs mt-0.5"
+                          style={{ color: 'var(--muted)', fontFamily: 'var(--mono)' }}
+                        >
+                          → {item.item_name_linked}
                         </div>
                       )}
                     </td>
                     <td className="px-3 py-2.5" style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--muted)' }}>
                       {item.part_number || '—'}
-                    </td>
-                    <td className="px-3 py-2.5">
-                      {item.destination_folder_name ? (() => {
-                        const isCross = projectName !== null && item.destination_folder_name !== projectName
-                        return (
-                          <span
-                            className="text-xs font-medium px-1.5 py-0.5 rounded whitespace-nowrap"
-                            style={isCross
-                              ? {
-                                  color: 'var(--warn)',
-                                  background: 'var(--warn-soft)',
-                                  border: '1px solid color-mix(in oklab, var(--warn) 30%, var(--line))',
-                                }
-                              : { color: 'var(--muted)' }
-                            }
-                          >
-                            {item.destination_folder_name}
-                          </span>
-                        )
-                      })() : <span style={{ color: 'var(--muted)' }}>—</span>}
                     </td>
                     <td className="px-3 py-2.5">
                       <span
@@ -236,20 +245,39 @@ export function ReceiptReview({
                         {badge.label}
                       </span>
                     </td>
-                    <td className="px-3 py-2.5 text-right" style={{ fontFamily: 'var(--mono)', fontSize: 13, color: 'var(--muted)' }}>
-                      {item.quantity_ordered}
+                    <td
+                      className="px-3 py-2.5 text-right font-medium"
+                      style={{ fontFamily: 'var(--mono)', fontSize: 13, color: 'var(--signal)' }}
+                    >
+                      {item.quantity_received}
                     </td>
-                    <td className="px-3 py-2.5 text-right font-medium" style={{ fontFamily: 'var(--mono)', fontSize: 13, color: 'var(--signal)' }}>
-                      {item.quantity_shipped.toLocaleString()}
-                    </td>
-                    <td className="px-3 py-2.5 text-right" style={{ fontFamily: 'var(--mono)', fontSize: 13, color: item.back_order > 0 ? 'var(--warn)' : 'var(--muted)' }}>
-                      {item.back_order > 0 ? item.back_order : '—'}
-                    </td>
-                    <td className="px-3 py-2.5 text-right" style={{ fontFamily: 'var(--mono)', fontSize: 13 }}>
-                      {currentQty ?? '—'}
-                    </td>
-                    <td className="px-3 py-2.5 text-right font-medium" style={{ fontFamily: 'var(--mono)', fontSize: 13 }}>
-                      {newQty !== null ? newQty : '—'}
+                    <td className="px-3 py-2.5">
+                      {poLine && afterThis !== null ? (
+                        <span
+                          className="text-xs"
+                          style={{ fontFamily: 'var(--mono)', color: 'var(--muted)' }}
+                        >
+                          {afterThis} / {poLine.quantity_ordered}
+                          {afterThis > poLine.quantity_ordered && (
+                            <span
+                              className="ml-1 font-medium"
+                              style={{ color: 'var(--warn)' }}
+                            >
+                              OVER
+                            </span>
+                          )}
+                          {afterThis === poLine.quantity_ordered && (
+                            <span
+                              className="ml-1 font-medium"
+                              style={{ color: 'var(--ok)' }}
+                            >
+                              ✓
+                            </span>
+                          )}
+                        </span>
+                      ) : (
+                        <span style={{ color: 'var(--muted)', fontSize: 12 }}>—</span>
+                      )}
                     </td>
                   </tr>
                 )
@@ -295,7 +323,7 @@ export function ReceiptReview({
         </button>
         <button
           onClick={handleConfirm}
-          disabled={isProcessing || activeItems.length === 0}
+          disabled={!canConfirm}
           className="flex items-center gap-1.5 px-5 py-2.5 rounded-lg text-sm font-medium text-white disabled:opacity-40"
           style={{ background: 'var(--signal)' }}
         >
@@ -312,6 +340,20 @@ export function ReceiptReview({
 }
 
 // ── Helpers ──
+
+function SummaryField({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <span
+        className="text-[var(--muted)]"
+        style={{ fontFamily: 'var(--mono)', fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '.06em' }}
+      >
+        {label}
+      </span>
+      <div className="font-medium text-[var(--ink)] mt-0.5">{value}</div>
+    </div>
+  )
+}
 
 function StatBadge({ count, label, color, bg }: { count: number; label: string; color: string; bg: string }) {
   return (

@@ -1,28 +1,28 @@
 /**
- * ReceiptLineItems — Step 2 of the receiving workflow
+ * ReceiptLineItems — Step 2 of the receiving workflow (Phase 4)
  *
- * Displays parsed/manual line items. Handles auto-matching for project
- * destinations and manual linking for warehouse destinations.
+ * Displays parsed/manual line items. Auto-matches against:
+ *  1. PO lines (if a PO is linked) — by part_number exact then name contains
+ *  2. Existing inventory items via useInventoryItems fuzzy match
+ *  3. Create new (default for no match)
+ *
+ * No Sortly imports.
  */
-import { useState, useEffect, useCallback, useMemo } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useState, useEffect, useCallback } from 'react'
 import { ReceiptItemRow } from './ReceiptItemRow'
 import { ItemMatchModal } from './ItemMatchModal'
 import { useFolderItems } from '../hooks/useFolderItems'
-import { useFolders } from '../../inventory/hooks/useFolders'
-import { useAppConfig } from '../../../hooks/useAppConfig'
-import { supabase } from '../../../lib/supabase'
+import { usePurchaseOrders } from '../../purchase-orders/hooks/usePurchaseOrders'
 import { Icon } from '../../../components/ui/Icon'
-import type { ReceivingLineItem, DestinationType, ItemAction } from '../types'
-import type { Project } from '../../../types/project'
+import type { ReceivingLineItem, ItemAction, POLineSuggestion } from '../types'
 
 interface ReceiptLineItemsProps {
   items: ReceivingLineItem[]
   setItems: (items: ReceivingLineItem[]) => void
-  destinationType: DestinationType
-  destinationFolderId: number | null
-  /** Display name for the destination folder (project name for project mode) */
-  destinationFolderName?: string | null
+  poId: number | null
+  /** Default destination location id (for new items) */
+  destinationLocationId: number | null
+  destinationLocationName: string | null
   /** Whether user chose manual entry (vs PDF upload) */
   isManualEntry?: boolean
   onBack: () => void
@@ -32,55 +32,44 @@ interface ReceiptLineItemsProps {
 export function ReceiptLineItems({
   items,
   setItems,
-  destinationType,
-  destinationFolderId,
-  destinationFolderName,
+  poId,
+  destinationLocationId,
+  destinationLocationName,
   isManualEntry,
   onBack,
   onNext,
 }: ReceiptLineItemsProps) {
-  const { data: appConfig } = useAppConfig()
-  const isProject = destinationType === 'project'
+  // Inventory item search (for auto-matching and modal search)
+  const { findMatches, isLoading: inventoryLoading } = useFolderItems()
 
-  const { data: allProjects = [] } = useQuery<Project[]>({
-    queryKey: ['projects', 'active'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('projects')
-        .select('id, name, sortly_warehouse_folder_id')
-        .eq('status', 'active')
-        .order('name')
-      if (error) throw error
-      return (data || []) as Project[]
-    },
-    staleTime: 5 * 60 * 1000,
-  })
-
-  // Build additional roots: all projects with a Sortly folder (including current destination)
-  const additionalRoots = useMemo(() =>
-    allProjects
-      .filter((p) => p.sortly_warehouse_folder_id != null)
-      .map((p) => ({ id: p.sortly_warehouse_folder_id!, label: p.name })),
-    [allProjects]
+  // PO lines for the linked PO (empty array if no PO)
+  const { data: poData = [] } = usePurchaseOrders(
+    poId ? { } : undefined,
   )
+  // Find the specific PO and extract its lines
+  const linkedPO = poId ? poData.find((po: { id: number }) => po.id === poId) : null
+  const poLines: POLineSuggestion[] = linkedPO?.line_items?.map((line: {
+    id: number
+    description: string
+    part_number: string | null
+    quantity_ordered: number
+    quantity_received: number
+    received_status: 'pending' | 'partial' | 'received' | 'over_received'
+    item_id: number | null
+  }) => ({
+    po_line_item_id: line.id,
+    description: line.description,
+    part_number: line.part_number,
+    quantity_ordered: line.quantity_ordered,
+    quantity_already_received: line.quantity_received,
+    quantity_remaining: line.quantity_ordered - line.quantity_received,
+    received_status: line.received_status,
+    item_id: line.item_id ?? null,
+  })) ?? []
 
-  // Build folder ID→name map for warehouse mode (to show folder in banner)
-  const { data: allFolders } = useFolders()
-  const folderNameMap = useMemo(
-    () => new Map((allFolders ?? []).map((f) => [f.id, f.name])),
-    [allFolders],
-  )
-
-  // Fetch items for matching: project = flat (folder only), warehouse = recursive (all subfolders)
-  const { items: folderItems, findMatches, isLoading: folderItemsLoading } =
-    useFolderItems(destinationFolderId, !isProject)
-
-  // For warehouse mode: modal for linking items
+  // Modal state
   const [linkingTempId, setLinkingTempId] = useState<string | null>(null)
   const linkingItem = items.find((i) => i.tempId === linkingTempId)
-
-  // For manual entry: modal to browse and add an existing Sortly item
-  const [showBrowseModal, setShowBrowseModal] = useState(false)
 
   // Manual add form
   const [showAddForm, setShowAddForm] = useState(!!isManualEntry)
@@ -88,41 +77,74 @@ export function ReceiptLineItems({
   const [newPartNumber, setNewPartNumber] = useState('')
   const [newQuantity, setNewQuantity] = useState(1)
 
-  // Auto-match on mount or when folder items load
+  // Auto-match items against PO lines first, then inventory
   const autoMatch = useCallback(() => {
-    if (folderItemsLoading || folderItems.length === 0) return
+    if (inventoryLoading) return
 
     const updated = items.map((item) => {
       if (item.action !== 'pending') return item
 
+      // 1. Try PO line match first (exact part_number → description contains)
+      if (poLines.length > 0) {
+        const pnLower = item.part_number?.toLowerCase().trim()
+        const nameLower = item.item_name.toLowerCase()
+
+        let bestPoLine: POLineSuggestion | null = null
+
+        if (pnLower) {
+          bestPoLine = poLines.find(
+            (l) => l.part_number?.toLowerCase().trim() === pnLower
+          ) ?? null
+        }
+        if (!bestPoLine) {
+          const nameWords = nameLower.split(' ')
+          bestPoLine = poLines.find(
+            (l) => nameWords.every((w) => l.description.toLowerCase().includes(w))
+          ) ?? null
+        }
+
+        if (bestPoLine) {
+          return {
+            ...item,
+            action: 'update' as ItemAction,
+            po_line_item_id: bestPoLine.po_line_item_id,
+            po_line_suggestion: bestPoLine,
+            item_id: bestPoLine.item_id ?? null,
+            item_name_linked: bestPoLine.item_id != null ? bestPoLine.description : null,
+            destination_location_id: destinationLocationId,
+            destination_location_name: destinationLocationName,
+          }
+        }
+      }
+
+      // 2. Try inventory match
       const matches = findMatches(item.item_name)
       if (matches.length > 0 && matches[0].score >= 0.7) {
         const best = matches[0].item
-        // For project mode use the passed-in folder name; for warehouse look up by parent_id
-        const folderName = isProject
-          ? (destinationFolderName ?? null)
-          : (folderNameMap.get(best.parent_id ?? 0) ?? null)
         return {
           ...item,
           action: 'update' as ItemAction,
-          sortly_item_id: best.id,
-          sortly_item_name: best.name,
-          sortly_current_quantity: Math.round(best.quantity ?? 0),
-          destination_folder_id: destinationFolderId,
-          destination_folder_name: folderName,
+          item_id: best.id,
+          item_name_linked: best.name,
+          current_stock_quantity: null,
+          po_line_item_id: null,
+          po_line_suggestion: null,
+          destination_location_id: destinationLocationId,
+          destination_location_name: destinationLocationName,
         }
       }
-      // No match → create new
+
+      // 3. Default to create
       return {
         ...item,
         action: 'create' as ItemAction,
-        destination_folder_id: destinationFolderId,
-        destination_folder_name: isProject ? (destinationFolderName ?? null) : null,
+        destination_location_id: destinationLocationId,
+        destination_location_name: destinationLocationName,
       }
     })
 
     setItems(updated)
-  }, [folderItemsLoading, folderItems.length, folderNameMap]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [inventoryLoading, poLines.length, items.length, destinationLocationId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     autoMatch()
@@ -139,14 +161,9 @@ export function ReceiptLineItems({
     setItems(items.map((i) => {
       if (i.tempId !== tempId) return i
       const updated = { ...i, [field]: qty }
-      // quantity_received always tracks quantity_shipped
       if (field === 'quantity_shipped') updated.quantity_received = qty
       return updated
     }))
-  }
-
-  const handleTagsChange = (tempId: string, tags: string[]) => {
-    setItems(items.map((i) => (i.tempId === tempId ? { ...i, tags } : i)))
   }
 
   const handleActionChange = (tempId: string, action: ItemAction) => {
@@ -162,11 +179,11 @@ export function ReceiptLineItems({
   }
 
   const handleLinkResult = (result: {
-    sortly_item_id: number | null
-    sortly_item_name: string | null
-    sortly_current_quantity: number | null
-    destination_folder_id: number
-    destination_folder_name: string
+    item_id: number | null
+    item_name_linked: string | null
+    current_stock_quantity: number | null
+    po_line_item_id: number | null
+    po_line_suggestion: POLineSuggestion | null
     action: 'update' | 'create'
   }) => {
     setItems(
@@ -174,13 +191,11 @@ export function ReceiptLineItems({
         i.tempId === linkingTempId
           ? {
               ...i,
-              sortly_item_id: result.sortly_item_id,
-              sortly_item_name: result.sortly_item_name,
-              sortly_current_quantity: result.sortly_current_quantity !== null
-                ? Math.round(result.sortly_current_quantity)
-                : null,
-              destination_folder_id: result.destination_folder_id,
-              destination_folder_name: result.destination_folder_name,
+              item_id: result.item_id,
+              item_name_linked: result.item_name_linked,
+              current_stock_quantity: result.current_stock_quantity,
+              po_line_item_id: result.po_line_item_id,
+              po_line_suggestion: result.po_line_suggestion,
               action: result.action,
             }
           : i
@@ -195,11 +210,12 @@ export function ReceiptLineItems({
         ? {
             ...i,
             action: 'create' as ItemAction,
-            sortly_item_id: null,
-            sortly_item_name: null,
-            sortly_current_quantity: null,
-            destination_folder_id: destinationFolderId,
-            destination_folder_name: isProject ? (destinationFolderName ?? null) : null,
+            item_id: null,
+            item_name_linked: null,
+            po_line_item_id: null,
+            po_line_suggestion: null,
+            destination_location_id: destinationLocationId,
+            destination_location_name: destinationLocationName,
           }
         : i
     ))
@@ -217,26 +233,15 @@ export function ReceiptLineItems({
       back_order: 0,
       quantity_received: newQuantity,
       confidence: 'high',
-      action: isProject ? 'create' : 'pending',
-      sortly_item_id: null,
-      sortly_item_name: null,
-      sortly_current_quantity: null,
-      destination_folder_id: destinationFolderId,
-      destination_folder_name: isProject ? (destinationFolderName ?? null) : null,
+      action: 'pending',
+      item_id: null,
+      item_name_linked: null,
+      current_stock_quantity: null,
+      po_line_item_id: null,
+      po_line_suggestion: null,
+      destination_location_id: destinationLocationId,
+      destination_location_name: destinationLocationName,
       notes: null,
-      tags: [],
-    }
-
-    // Try auto-matching the new item against existing folder items
-    if (folderItems.length > 0) {
-      const matches = findMatches(newItemName.trim())
-      if (matches.length > 0 && matches[0].score >= 0.7) {
-        const best = matches[0].item
-        newItem.action = 'update'
-        newItem.sortly_item_id = best.id
-        newItem.sortly_item_name = best.name
-        newItem.sortly_current_quantity = Math.round(best.quantity ?? 0)
-      }
     }
 
     setItems([...items, newItem])
@@ -246,40 +251,9 @@ export function ReceiptLineItems({
     if (!isManualEntry) setShowAddForm(false)
   }
 
-  const handleBrowseResult = (result: {
-    sortly_item_id: number | null
-    sortly_item_name: string | null
-    sortly_current_quantity: number | null
-    destination_folder_id: number
-    destination_folder_name: string
-    action: 'update' | 'create'
-  }) => {
-    const newItem: ReceivingLineItem = {
-      tempId: `browse-${Date.now()}`,
-      item_name: result.sortly_item_name || 'New item',
-      part_number: null,
-      quantity_ordered: 1,
-      quantity_shipped: 1,
-      back_order: 0,
-      quantity_received: 1,
-      confidence: 'high',
-      action: result.action,
-      sortly_item_id: result.sortly_item_id,
-      sortly_item_name: result.sortly_item_name,
-      sortly_current_quantity: result.sortly_current_quantity !== null
-        ? Math.round(result.sortly_current_quantity)
-        : null,
-      destination_folder_id: result.destination_folder_id,
-      destination_folder_name: result.destination_folder_name,
-      notes: null,
-      tags: [],
-    }
-    setItems([...items, newItem])
-    setShowBrowseModal(false)
-  }
-
   const activeItems = items.filter((i) => i.action !== 'skip')
-  const canProceed = activeItems.length > 0
+  const canProceed = activeItems.length > 0 && activeItems.every((i) => i.action !== 'pending')
+  const pendingCount = items.filter((i) => i.action === 'pending').length
 
   return (
     <div className="space-y-4">
@@ -288,13 +262,17 @@ export function ReceiptLineItems({
         <div className="text-sm text-[var(--muted)]">
           <b className="text-[var(--ink-2)] font-medium">{items.length}</b> item
           {items.length !== 1 ? 's' : ''}
-          {folderItemsLoading && (
+          {inventoryLoading && (
             <span className="ml-2">
               <span className="loading loading-spinner" style={{ width: 12, height: 12 }} /> Matching...
             </span>
           )}
+          {poId && poLines.length > 0 && (
+            <span className="ml-2 text-xs" style={{ color: 'var(--signal)' }}>
+              · {poLines.length} PO line{poLines.length !== 1 ? 's' : ''} available
+            </span>
+          )}
         </div>
-        {/* Hide "+ Add item" when form is already showing */}
         {!showAddForm && (
           <button
             onClick={() => setShowAddForm(true)}
@@ -306,13 +284,23 @@ export function ReceiptLineItems({
         )}
       </div>
 
+      {/* Pending warning */}
+      {pendingCount > 0 && !inventoryLoading && (
+        <div
+          className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm"
+          style={{ background: 'var(--warn-soft)', color: 'var(--warn)' }}
+        >
+          <Icon name="alert" className="w-4 h-4 shrink-0" />
+          {pendingCount} item{pendingCount !== 1 ? 's need' : ' needs'} to be linked before you can proceed.
+        </div>
+      )}
+
       {/* Manual add form */}
       {showAddForm && (
         <div
           className="rounded-xl p-4 space-y-3 relative"
           style={{ background: 'var(--panel-2)' }}
         >
-          {/* G: Cancel only when toggleable (non-manual mode) */}
           {!isManualEntry && (
             <button
               onClick={() => setShowAddForm(false)}
@@ -321,8 +309,6 @@ export function ReceiptLineItems({
               Cancel
             </button>
           )}
-
-          {/* Primary: Create new item form */}
           <div className="rounded-lg border border-[var(--line)] bg-[var(--panel)] px-4 py-3.5">
             <div className="flex items-center gap-2 mb-3">
               <div
@@ -334,7 +320,7 @@ export function ReceiptLineItems({
               >
                 <Icon name="plus" className="w-3.5 h-3.5" style={{ color: 'var(--info)' }} />
               </div>
-              <div className="text-sm font-medium text-[var(--ink)]">Create new item</div>
+              <div className="text-sm font-medium text-[var(--ink)]">Add item</div>
             </div>
             <div className="flex gap-2 items-end">
               <div className="flex-1 min-w-0">
@@ -394,27 +380,6 @@ export function ReceiptLineItems({
               </button>
             </div>
           </div>
-
-          {/* Secondary: Browse existing */}
-          <button
-            onClick={() => setShowBrowseModal(true)}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg border border-[var(--line)] bg-[var(--panel)] hover:border-[var(--signal)] transition-colors text-left group"
-          >
-            <div
-              className="w-7 h-7 rounded-md grid place-items-center shrink-0"
-              style={{
-                background: 'var(--ok-soft)',
-                border: '1px solid color-mix(in oklab, var(--ok) 30%, var(--line))',
-              }}
-            >
-              <Icon name="search" className="w-3.5 h-3.5" style={{ color: 'var(--ok)' }} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium text-[var(--ink)]">Link to existing item</div>
-              <div className="text-xs text-[var(--muted)] mt-0.5">Browse Sortly inventory and update quantity</div>
-            </div>
-            <Icon name="chevron-right" className="w-4 h-4 text-[var(--faint)] group-hover:text-[var(--signal)] transition-colors shrink-0" />
-          </button>
         </div>
       )}
 
@@ -424,15 +389,14 @@ export function ReceiptLineItems({
           <ReceiptItemRow
             key={item.tempId}
             item={item}
+            poLines={poLines}
             onFieldChange={handleFieldChange}
             onQuantityChange={handleQuantityChange}
-            onTagsChange={handleTagsChange}
             onActionChange={handleActionChange}
             onLink={handleLink}
             onCreateNew={handleCreateNew}
             onRemove={handleRemove}
-            isProject={isProject}
-            sessionFolderName={destinationFolderName ?? null}
+            destinationLocationName={destinationLocationName}
           />
         ))}
       </div>
@@ -440,9 +404,7 @@ export function ReceiptLineItems({
       {items.length === 0 && (
         <div className="text-center py-8 text-[var(--muted)]">
           {showAddForm ? (
-            <p className="text-sm">
-              Items you add will appear here. Each item can be linked to existing inventory or created as new.
-            </p>
+            <p className="text-sm">Items you add will appear here.</p>
           ) : (
             <>
               <p className="text-base font-medium">No items yet</p>
@@ -471,33 +433,17 @@ export function ReceiptLineItems({
         </button>
       </div>
 
-      {/* Link modal — relink an existing item row */}
-      <ItemMatchModal
-        isOpen={!!linkingTempId}
-        onClose={() => setLinkingTempId(null)}
-        onSelect={handleLinkResult}
-        itemName={linkingItem?.item_name || ''}
-        mainWarehouseFolderId={appConfig?.mainWarehouseFolderId ?? null}
-        rootFolderLabel="Main Warehouse"
-        additionalRoots={additionalRoots}
-        defaultFolderId={destinationFolderId}
-        defaultFolderName={destinationFolderName ?? null}
-        highlightedRootId={destinationFolderId}
-      />
-
-      {/* Browse modal — manual entry: add a new item from Sortly */}
-      <ItemMatchModal
-        isOpen={showBrowseModal}
-        onClose={() => setShowBrowseModal(false)}
-        onSelect={handleBrowseResult}
-        itemName=""
-        mainWarehouseFolderId={appConfig?.mainWarehouseFolderId ?? null}
-        rootFolderLabel="Main Warehouse"
-        additionalRoots={additionalRoots}
-        defaultFolderId={destinationFolderId}
-        defaultFolderName={destinationFolderName ?? null}
-        highlightedRootId={destinationFolderId}
-      />
+      {/* Link modal */}
+      {linkingTempId && linkingItem && (
+        <ItemMatchModal
+          isOpen={true}
+          onClose={() => setLinkingTempId(null)}
+          onSelect={handleLinkResult}
+          itemName={linkingItem.item_name}
+          partNumber={linkingItem.part_number}
+          poLines={poLines}
+        />
+      )}
     </div>
   )
 }

@@ -134,6 +134,12 @@ const icons = {
   clock: (p: SVGProps<SVGSVGElement>) => (
     <svg {...sp} {...p}><circle cx="12" cy="12" r="9" /><polyline points="12 6 12 12 16 14" /></svg>
   ),
+  list: (p: SVGProps<SVGSVGElement>) => (
+    <svg {...sp} {...p}><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" /></svg>
+  ),
+  grid: (p: SVGProps<SVGSVGElement>) => (
+    <svg {...sp} {...p}><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></svg>
+  ),
 }
 
 export type IconName = keyof typeof icons

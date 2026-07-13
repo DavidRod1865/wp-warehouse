@@ -21,6 +21,8 @@ interface ParsedPurchaseOrder {
   po_number: string | null;
   vendor_name: string | null;
   po_date: string | null; // 'YYYY-MM-DD' or null
+  /** Document grand total when line items lack individual prices */
+  total_amount: number | null;
   lines: ParsedLine[];
 }
 
@@ -92,6 +94,7 @@ Return a JSON object with this exact shape:
   "po_number": "string or null (if not found)",
   "vendor_name": "string or null (if not found)",
   "po_date": "YYYY-MM-DD format or null (if not found)",
+  "total_amount": number or null,
   "lines": [
     {
       "line_number": number (1-indexed),
@@ -108,13 +111,16 @@ Rules for extraction:
 - PO Number: Look for "PO", "PO#", "Order Number", "Purchase Order No" or similar. Return null if not found.
 - Vendor Name: Extract vendor/supplier name. Return null if not found.
 - PO Date: Look for date field. Parse as YYYY-MM-DD. Return null if not found.
-- Lines: Extract all line items (skip headers, totals, and shipping info).
+- total_amount: The document grand total / PO total / lump-sum amount when present. Prefer the overall PO total over shipping-only or tax-only lines. Return null if not found.
+- Lines: Extract all line items (skip headers and shipping/tax breakdown rows as line items).
   - line_number: 1-indexed sequential number
   - description: Clean product/item description (no extra codes unless they're part of name)
   - part_number: SKU, part number, catalog number, or null if not found
   - quantity_ordered: Integer quantity ordered. Default to 1 if unclear.
-  - unit_price: Unit price as number, or null if not found
+  - unit_price: Per-unit price as number, or null if the vendor did not print individual prices
   - confidence: "high" if all fields are clearly readable, "low" if any field is unclear/missing/inferred
+
+If the PO has a single total but no per-line prices, set each line unit_price to null and put the total in total_amount.
 
 Return ONLY the JSON object, no other text.`;
 
@@ -201,10 +207,18 @@ Return ONLY the JSON object, no other text.`;
     }
 
     // Validate and normalize the response
+    const rawTotal = (parsedPO as { total_amount?: unknown }).total_amount
+    const totalAmount =
+      rawTotal != null && rawTotal !== ""
+        ? parseFloat(String(rawTotal))
+        : null
+
     const normalized: ParsedPurchaseOrder = {
       po_number: parsedPO.po_number || null,
       vendor_name: parsedPO.vendor_name || null,
       po_date: parsedPO.po_date || null,
+      total_amount:
+        totalAmount != null && !Number.isNaN(totalAmount) ? totalAmount : null,
       lines: (parsedPO.lines || []).map((line, idx) => ({
         line_number: line.line_number || idx + 1,
         description: String(line.description || "Unknown item"),

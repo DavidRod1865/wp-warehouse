@@ -7,6 +7,20 @@ import { supabase } from '../../../lib/supabase'
 import { projectKeys } from './projectKeys'
 import type { Project } from '../../../types/project'
 
+const PROJECT_SELECT = '*, general_contractors(company_name)'
+
+type ProjectRow = Project & {
+  general_contractors?: { company_name: string } | null
+}
+
+function mapProject(row: ProjectRow): Project {
+  const { general_contractors, ...project } = row
+  return {
+    ...project,
+    general_contractor: general_contractors?.company_name ?? project.general_contractor,
+  }
+}
+
 interface UseProjectsOptions {
   status?: string
   search?: string
@@ -22,7 +36,7 @@ export function useProjects({ status, search = '', activeOnly = false }: UseProj
       ...(activeOnly ? ['active'] : []),
     ] : projectKeys.list(),
     queryFn: async () => {
-      let query = supabase.from('projects').select('*')
+      let query = supabase.from('projects').select(PROJECT_SELECT)
 
       if (status) {
         query = query.eq('status', status)
@@ -39,7 +53,7 @@ export function useProjects({ status, search = '', activeOnly = false }: UseProj
       const { data, error } = await query.order('created_at', { ascending: false })
 
       if (error) throw error
-      return data as Project[]
+      return (data as ProjectRow[]).map(mapProject)
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
   })
@@ -51,12 +65,12 @@ export function useProjectDetail(id: number) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('projects')
-        .select('*')
+        .select(PROJECT_SELECT)
         .eq('id', id)
         .single()
 
       if (error) throw error
-      return data as Project
+      return mapProject(data as ProjectRow)
     },
     staleTime: 5 * 60 * 1000,
     enabled: !!id,

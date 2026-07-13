@@ -25,7 +25,7 @@ export function useCreateVendor() {
             email: values.email || null,
             address: values.address || null,
             notes: values.notes || null,
-            is_active: true,
+            is_active: values.is_active,
           },
         ])
         .select()
@@ -60,6 +60,7 @@ export function useUpdateVendor() {
           email: values.email || null,
           address: values.address || null,
           notes: values.notes || null,
+          is_active: values.is_active,
           updated_at: new Date().toISOString(),
         })
         .eq('id', id)

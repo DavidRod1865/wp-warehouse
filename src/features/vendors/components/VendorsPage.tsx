@@ -5,7 +5,6 @@
  */
 import { useState } from 'react'
 import { useVendors, type Vendor } from '../hooks/useVendors'
-import { useToggleVendorActive } from '../hooks/useVendorMutations'
 import { Icon } from '../../../components/ui/Icon'
 import { VendorFormModal } from './VendorFormModal'
 
@@ -62,20 +61,19 @@ export default function VendorsPage() {
               <th className="px-4 py-3 text-left font-semibold text-[var(--ink)]">Contact</th>
               <th className="px-4 py-3 text-left font-semibold text-[var(--ink)]">Phone</th>
               <th className="px-4 py-3 text-left font-semibold text-[var(--ink)]">Email</th>
-              <th className="px-4 py-3 text-center font-semibold text-[var(--ink)]">Status</th>
               <th className="px-4 py-3 text-right font-semibold text-[var(--ink)]">Actions</th>
             </tr>
           </thead>
           <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-[var(--muted)]">
+                <td colSpan={5} className="px-4 py-8 text-center text-[var(--muted)]">
                   <span className="loading loading-spinner loading-sm" />
                 </td>
               </tr>
             ) : vendors.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-[var(--muted)]">
+                <td colSpan={5} className="px-4 py-8 text-center text-[var(--muted)]">
                   {searchQuery ? 'No matching vendors' : 'No vendors yet'}
                 </td>
               </tr>
@@ -115,27 +113,12 @@ function VendorRow({
   vendor: Vendor
   onEdit: () => void
 }) {
-  const toggleActive = useToggleVendorActive()
-
   return (
     <tr className="border-b border-[var(--line)] hover:bg-[var(--panel-2)] transition-colors">
       <td className="px-4 py-3 font-medium text-[var(--ink)]">{vendor.name}</td>
       <td className="px-4 py-3 text-[var(--muted)]">{vendor.contact_name || '—'}</td>
       <td className="px-4 py-3 text-[var(--muted)]">{vendor.phone || '—'}</td>
       <td className="px-4 py-3 text-[var(--muted)]">{vendor.email || '—'}</td>
-      <td className="px-4 py-3 text-center">
-        <label className="cursor-pointer flex justify-center">
-          <input
-            type="checkbox"
-            checked={vendor.is_active}
-            onChange={(e) =>
-              toggleActive.mutate({ id: Number(vendor.id), isActive: e.target.checked })
-            }
-            className="checkbox checkbox-sm"
-            disabled={toggleActive.isPending}
-          />
-        </label>
-      </td>
       <td className="px-4 py-3 text-right">
         <button
           onClick={onEdit}

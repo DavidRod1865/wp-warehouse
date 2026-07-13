@@ -17,9 +17,12 @@ interface ModalState {
   project?: Project
 }
 
+type ViewMode = 'list' | 'grid'
+
 export default function ProjectsPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [modal, setModal] = useState<ModalState>({ type: 'none' })
 
   const { data: projects = [], isLoading } = useProjects({
@@ -68,6 +71,39 @@ export default function ProjectsPage() {
           </select>
         </div>
 
+        <div
+          className="inline-flex rounded-lg border border-[var(--line)] p-0.5"
+          role="group"
+          aria-label="View mode"
+        >
+          <button
+            type="button"
+            onClick={() => setViewMode('list')}
+            aria-pressed={viewMode === 'list'}
+            title="List view"
+            className={`p-2 rounded-md transition-colors ${
+              viewMode === 'list'
+                ? 'view-toggle-active'
+                : 'text-[var(--muted)] hover:text-[var(--ink)]'
+            }`}
+          >
+            <Icon name="list" className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('grid')}
+            aria-pressed={viewMode === 'grid'}
+            title="Grid view"
+            className={`p-2 rounded-md transition-colors ${
+              viewMode === 'grid'
+                ? 'view-toggle-active'
+                : 'text-[var(--muted)] hover:text-[var(--ink)]'
+            }`}
+          >
+            <Icon name="grid" className="w-4 h-4" />
+          </button>
+        </div>
+
         <button
           onClick={() => setModal({ type: 'create' })}
           className="px-4 py-2 rounded-lg text-white text-sm font-medium hover:opacity-90"
@@ -88,12 +124,19 @@ export default function ProjectsPage() {
           {searchQuery || statusFilter ? 'No matching projects' : 'No projects yet'}
         </div>
       ) : (
-        <div className="space-y-3">
+        <div
+          className={
+            viewMode === 'grid'
+              ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3'
+              : 'space-y-3'
+          }
+        >
           {projects.map((project) => (
             <ProjectCard
               key={project.id}
               project={project}
               onEdit={() => setModal({ type: 'edit', project })}
+              layout={viewMode}
             />
           ))}
         </div>
@@ -118,49 +161,104 @@ export default function ProjectsPage() {
 function ProjectCard({
   project,
   onEdit,
+  layout = 'list',
 }: {
   project: Project
   onEdit: () => void
+  layout?: ViewMode
 }) {
-  const statusColor = {
-    active: 'bg-[color-mix(in_oklab,var(--signal)_10%,var(--panel))] text-[var(--signal)]',
-    completed: 'bg-[color-mix(in_oklab,#22c55e_10%,var(--panel))] text-[#22c55e]',
-    on_hold: 'bg-[color-mix(in_oklab,#f59e0b_10%,var(--panel))] text-[#f59e0b]',
-    cancelled: 'bg-[color-mix(in_oklab,var(--danger)_10%,var(--panel))] text-[var(--danger)]',
+  const statusStyles: Record<string, string> = {
+    active:
+      'bg-[color-mix(in_oklab,var(--signal)_12%,var(--panel))] text-[var(--signal)] border-[color-mix(in_oklab,var(--signal)_30%,transparent)]',
+    completed:
+      'bg-[var(--ok-soft)] text-[var(--ok)] border-[color-mix(in_oklab,var(--ok)_28%,transparent)]',
+    on_hold:
+      'bg-[var(--warn-soft)] text-[var(--warn)] border-[color-mix(in_oklab,var(--warn)_28%,transparent)]',
+    cancelled:
+      'bg-[var(--danger-soft)] text-[var(--danger)] border-[color-mix(in_oklab,var(--danger)_28%,transparent)]',
   }
 
+  const statusLabels: Record<string, string> = {
+    active: 'Active',
+    completed: 'Completed',
+    on_hold: 'On hold',
+    cancelled: 'Cancelled',
+  }
+
+  const cityLine = [
+    project.project_address?.city,
+    project.project_address?.state,
+    project.project_address?.zip_code,
+  ]
+    .filter(Boolean)
+    .join(', ')
+
+  const addressFull = [
+    project.project_address?.street_address,
+    project.project_address?.city,
+    project.project_address?.state,
+    project.project_address?.zip_code,
+  ]
+    .filter(Boolean)
+    .join(', ')
+
+  const isGrid = layout === 'grid'
+
   return (
-    <div className="p-4 border border-[var(--line)] rounded-lg hover:bg-[var(--panel-2)] transition-colors">
-      <div className="flex items-start justify-between">
-        <div className="flex-1">
-          <h3 className="font-semibold text-[var(--ink)]">{project.name}</h3>
-          <div className="mt-2 flex gap-2 flex-wrap">
-            <span
-              className={`text-xs px-2 py-1 rounded ${
-                statusColor[project.status as keyof typeof statusColor] ||
-                'bg-[var(--panel-2)] text-[var(--muted)]'
-              }`}
-            >
-              {project.status}
-            </span>
-          </div>
+    <div
+      className={`p-4 border border-[var(--line)] rounded-lg hover:bg-[var(--panel-2)] transition-colors ${
+        isGrid ? 'h-full' : ''
+      }`}
+    >
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1 min-w-0">
+          <h3 className="font-semibold text-[var(--ink)] tracking-tight">
+            {isGrid && project.general_contractor ? (
+              <>
+                <span className="block">{project.general_contractor}</span>
+                <span className="block">{project.name}</span>
+              </>
+            ) : project.general_contractor ? (
+              `${project.general_contractor} - ${project.name}`
+            ) : (
+              project.name
+            )}
+          </h3>
           {project.project_address && (
-            <div className="mt-2 text-xs text-[var(--muted)]">
-              {[project.project_address.street_address, project.project_address.city, project.project_address.state, project.project_address.zip_code]
-                .filter(Boolean)
-                .join(', ')}
+            <div className="mt-1 text-sm text-[var(--muted)]">
+              {isGrid ? (
+                <>
+                  {project.project_address.street_address && (
+                    <div>{project.project_address.street_address}</div>
+                  )}
+                  {cityLine && <div>{cityLine}</div>}
+                </>
+              ) : (
+                addressFull
+              )}
             </div>
           )}
           {project.notes && (
-            <div className="mt-2 text-xs text-[var(--muted)]">{project.notes}</div>
+            <div className="mt-2 text-xs text-[var(--muted)] line-clamp-2">{project.notes}</div>
           )}
         </div>
-        <button
-          onClick={onEdit}
-          className="p-2 rounded-lg text-[var(--muted)] hover:bg-[var(--panel-2)]"
-        >
-          <Icon name="edit" className="w-4 h-4" />
-        </button>
+        <div className="flex flex-col items-end gap-2 shrink-0">
+          <button
+            onClick={onEdit}
+            className="p-2 rounded-lg text-[var(--muted)] hover:bg-[var(--panel)] hover:text-[var(--ink)]"
+          >
+            <Icon name="edit" className="w-4 h-4" />
+          </button>
+          <span
+            className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11.5px] font-medium leading-snug border whitespace-nowrap ${
+              statusStyles[project.status] ||
+              'bg-transparent text-[var(--muted)] border-[var(--line)]'
+            }`}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-current" />
+            {statusLabels[project.status] || project.status}
+          </span>
+        </div>
       </div>
     </div>
   )

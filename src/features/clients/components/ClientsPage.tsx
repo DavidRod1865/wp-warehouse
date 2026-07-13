@@ -8,6 +8,7 @@ import { useClients, useClientProjects, type GeneralContractor } from '../hooks/
 import { useToggleClientActive } from '../hooks/useClientMutations'
 import { Icon } from '../../../components/ui/Icon'
 import { ClientFormModal } from './ClientFormModal'
+import { useToast } from '../../../components/ui/Toast'
 
 interface ModalState {
   type: 'none' | 'create' | 'edit' | 'detail'
@@ -63,20 +64,19 @@ export default function ClientsPage() {
               <th className="px-4 py-3 text-left font-semibold text-[var(--ink)]">Phone</th>
               <th className="px-4 py-3 text-left font-semibold text-[var(--ink)]">Email</th>
               <th className="px-4 py-3 text-center font-semibold text-[var(--ink)]">Projects</th>
-              <th className="px-4 py-3 text-center font-semibold text-[var(--ink)]">Status</th>
               <th className="px-4 py-3 text-right font-semibold text-[var(--ink)]">Actions</th>
             </tr>
           </thead>
           <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-[var(--muted)]">
+                <td colSpan={6} className="px-4 py-8 text-center text-[var(--muted)]">
                   <span className="loading loading-spinner loading-sm" />
                 </td>
               </tr>
             ) : clients.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-[var(--muted)]">
+                <td colSpan={6} className="px-4 py-8 text-center text-[var(--muted)]">
                   {searchQuery ? 'No matching clients' : 'No clients yet'}
                 </td>
               </tr>
@@ -128,7 +128,6 @@ function ClientRow({
   onEdit: () => void
   onDetail: () => void
 }) {
-  const toggleActive = useToggleClientActive()
   const { data: projects = [], isLoading } = useClientProjects(client.id)
 
   return (
@@ -139,19 +138,6 @@ function ClientRow({
       <td className="px-4 py-3 text-[var(--muted)]">{client.email || '—'}</td>
       <td className="px-4 py-3 text-center">
         <span className="text-sm font-mono">{isLoading ? '…' : projects.length}</span>
-      </td>
-      <td className="px-4 py-3 text-center">
-        <label className="cursor-pointer flex justify-center">
-          <input
-            type="checkbox"
-            checked={client.is_active}
-            onChange={(e) =>
-              toggleActive.mutate({ id: client.id, isActive: e.target.checked })
-            }
-            className="checkbox checkbox-sm"
-            disabled={toggleActive.isPending}
-          />
-        </label>
       </td>
       <td className="px-4 py-3 text-right space-x-1">
         <button
@@ -181,6 +167,9 @@ function ClientDetailModal({
   onEdit: () => void
 }) {
   const { data: projects = [] } = useClientProjects(client.id)
+  const toggleActive = useToggleClientActive()
+  const { toast } = useToast()
+  const [isActive, setIsActive] = useState(client.is_active)
 
   return (
     <div
@@ -207,16 +196,6 @@ function ClientDetailModal({
         </div>
 
         <div className="px-6 py-5 space-y-6">
-          {/* Info */}
-          <div className="space-y-2">
-            <div className="text-xs text-[var(--muted)] uppercase" style={{ fontFamily: 'var(--mono)', letterSpacing: '.08em' }}>Contact Info</div>
-            <div className="space-y-1 text-sm">
-              {client.contact_name && <div><span className="text-[var(--muted)]">Contact:</span> {client.contact_name}</div>}
-              {client.phone && <div><span className="text-[var(--muted)]">Phone:</span> {client.phone}</div>}
-              {client.email && <div><span className="text-[var(--muted)]">Email:</span> {client.email}</div>}
-            </div>
-          </div>
-
           {/* Address */}
           {client.billing_address && Object.keys(client.billing_address).length > 0 && (
             <div className="space-y-2">
@@ -233,6 +212,39 @@ function ClientDetailModal({
               </div>
             </div>
           )}
+
+          {/* Info */}
+          <div className="space-y-2">
+            <div className="text-xs text-[var(--muted)] uppercase" style={{ fontFamily: 'var(--mono)', letterSpacing: '.08em' }}>Contact Info</div>
+            <div className="space-y-1 text-sm">
+              {client.contact_name && <div><span className="text-[var(--muted)]">Contact:</span> {client.contact_name}</div>}
+              {client.phone && <div><span className="text-[var(--muted)]">Phone:</span> {client.phone}</div>}
+              {client.email && <div><span className="text-[var(--muted)]">Email:</span> {client.email}</div>}
+            </div>
+          </div>
+
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={isActive}
+              onChange={(e) => {
+                const next = e.target.checked
+                setIsActive(next)
+                toggleActive.mutate(
+                  { id: client.id, isActive: next },
+                  {
+                    onError: (err) => {
+                      setIsActive(!next)
+                      toast(err instanceof Error ? err.message : 'Failed to update active', 'error')
+                    },
+                  },
+                )
+              }}
+              className="checkbox checkbox-sm"
+              disabled={toggleActive.isPending}
+            />
+            <span className="text-sm text-[var(--ink)]">Active</span>
+          </label>
 
           {/* Notes */}
           {client.notes && (

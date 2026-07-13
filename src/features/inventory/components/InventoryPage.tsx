@@ -265,19 +265,21 @@ function MoveStockModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 grid place-items-center p-4"
+      className="fixed inset-0 z-50 overflow-y-auto overscroll-contain"
       style={{
         background: 'color-mix(in oklab, var(--ink) 35%, transparent)',
         backdropFilter: 'blur(4px)',
       }}
-      onClick={onClose}
     >
+      <div className="flex min-h-full items-start justify-center p-4 sm:items-center">
       <div
-        onClick={(e) => e.stopPropagation()}
-        className="bg-[var(--panel)] rounded-xl w-full max-w-md overflow-hidden"
-        style={{ boxShadow: '0 20px 60px -20px rgba(15,23,41,.35), 0 0 0 1px var(--line)' }}
+        className="bg-[var(--panel)] rounded-xl w-full max-w-md my-4 sm:my-0 flex flex-col"
+        style={{
+          maxHeight: 'min(900px, calc(100dvh - 32px))',
+          boxShadow: '0 20px 60px -20px rgba(15,23,41,.35), 0 0 0 1px var(--line)',
+        }}
       >
-        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-[var(--line)]">
+        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-[var(--line)] shrink-0">
           <h3 className="text-lg font-semibold">Move Stock</h3>
           <button
             onClick={onClose}
@@ -288,7 +290,7 @@ function MoveStockModal({
           </button>
         </div>
 
-        <div className="px-6 py-5 space-y-4">
+        <div className="px-6 py-5 space-y-4 overflow-y-auto min-h-0">
           <FormField label="Item">
             <div className="form-input bg-[var(--panel-2)] text-[var(--ink)]">
               {stockLevel.item?.name || '—'}
@@ -344,7 +346,7 @@ function MoveStockModal({
         </div>
 
         <div
-          className="flex justify-end gap-2 px-6 py-3.5 border-t border-[var(--line)]"
+          className="flex justify-end gap-2 px-6 py-3.5 border-t border-[var(--line)] shrink-0"
           style={{ background: 'color-mix(in oklab, var(--panel-2) 50%, var(--panel))' }}
         >
           <button
@@ -363,6 +365,7 @@ function MoveStockModal({
             {saving ? <span className="loading loading-spinner loading-sm" /> : 'Move'}
           </button>
         </div>
+      </div>
       </div>
     </div>
   )
@@ -430,20 +433,22 @@ function AddItemModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 grid place-items-center p-4"
+      className="fixed inset-0 z-50 overflow-y-auto overscroll-contain"
       style={{
         background: 'color-mix(in oklab, var(--ink) 35%, transparent)',
         backdropFilter: 'blur(4px)',
       }}
-      onClick={onClose}
     >
+      <div className="flex min-h-full items-start justify-center p-4 sm:items-center">
       <div
-        onClick={(e) => e.stopPropagation()}
-        className="bg-[var(--panel)] rounded-xl w-full max-w-md overflow-hidden"
-        style={{ boxShadow: '0 20px 60px -20px rgba(15,23,41,.35), 0 0 0 1px var(--line)' }}
+        className="bg-[var(--panel)] rounded-xl w-full max-w-md my-4 sm:my-0 flex flex-col"
+        style={{
+          maxHeight: 'min(900px, calc(100dvh - 32px))',
+          boxShadow: '0 20px 60px -20px rgba(15,23,41,.35), 0 0 0 1px var(--line)',
+        }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-[var(--line)]">
+        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-[var(--line)] shrink-0">
           <h3 className="text-lg font-semibold">Add Item</h3>
           <button
             onClick={onClose}
@@ -455,12 +460,15 @@ function AddItemModal({
         </div>
 
         {/* Form */}
-        <div className="px-6 py-5 space-y-4">
+        <div className="px-6 py-5 space-y-4 overflow-y-auto min-h-0">
           <FormField label="Name" required>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && isValid && !saving) handleSave()
+              }}
               placeholder="Item name"
               className="form-input w-full"
               autoFocus
@@ -473,6 +481,9 @@ function AddItemModal({
               type="text"
               value={partNumber}
               onChange={(e) => setPartNumber(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && isValid && !saving) handleSave()
+              }}
               placeholder="Part #"
               className="form-input w-full"
               disabled={saving}
@@ -495,6 +506,9 @@ function AddItemModal({
               type="number"
               value={unitCost}
               onChange={(e) => setUnitCost(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && isValid && !saving) handleSave()
+              }}
               placeholder="0.00"
               step={0.01}
               min={0}
@@ -525,6 +539,9 @@ function AddItemModal({
                 type="number"
                 value={initialQty}
                 onChange={(e) => setInitialQty(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && isValid && !saving) handleSave()
+                }}
                 placeholder="0"
                 min={0}
                 className="form-input w-full"
@@ -536,7 +553,7 @@ function AddItemModal({
 
         {/* Footer */}
         <div
-          className="flex justify-end gap-2 px-6 py-3.5 border-t border-[var(--line)]"
+          className="flex justify-end gap-2 px-6 py-3.5 border-t border-[var(--line)] shrink-0"
           style={{ background: 'color-mix(in oklab, var(--panel-2) 50%, var(--panel))' }}
         >
           <button
@@ -555,6 +572,7 @@ function AddItemModal({
             {saving ? <span className="loading loading-spinner loading-sm" /> : 'Add Item'}
           </button>
         </div>
+      </div>
       </div>
     </div>
   )
@@ -609,19 +627,21 @@ function AdjustQuantityModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 grid place-items-center p-4"
+      className="fixed inset-0 z-50 overflow-y-auto overscroll-contain"
       style={{
         background: 'color-mix(in oklab, var(--ink) 35%, transparent)',
         backdropFilter: 'blur(4px)',
       }}
-      onClick={onClose}
     >
+      <div className="flex min-h-full items-start justify-center p-4 sm:items-center">
       <div
-        onClick={(e) => e.stopPropagation()}
-        className="bg-[var(--panel)] rounded-xl w-full max-w-md overflow-hidden"
-        style={{ boxShadow: '0 20px 60px -20px rgba(15,23,41,.35), 0 0 0 1px var(--line)' }}
+        className="bg-[var(--panel)] rounded-xl w-full max-w-md my-4 sm:my-0 flex flex-col"
+        style={{
+          maxHeight: 'min(900px, calc(100dvh - 32px))',
+          boxShadow: '0 20px 60px -20px rgba(15,23,41,.35), 0 0 0 1px var(--line)',
+        }}
       >
-        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-[var(--line)]">
+        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-[var(--line)] shrink-0">
           <h3 className="text-lg font-semibold">Adjust Quantity</h3>
           <button
             onClick={onClose}
@@ -632,7 +652,7 @@ function AdjustQuantityModal({
           </button>
         </div>
 
-        <div className="px-6 py-5 space-y-4">
+        <div className="px-6 py-5 space-y-4 overflow-y-auto min-h-0">
           <FormField label="Item">
             <div className="form-input bg-[var(--panel-2)] text-[var(--ink)]">
               {stockLevel.item?.name || '—'}
@@ -668,6 +688,9 @@ function AdjustQuantityModal({
               type="text"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && isValid && !saving) handleSave()
+              }}
               placeholder="e.g., Physical count, Damage, Loss..."
               className="form-input w-full"
               disabled={saving}
@@ -676,7 +699,7 @@ function AdjustQuantityModal({
         </div>
 
         <div
-          className="flex justify-end gap-2 px-6 py-3.5 border-t border-[var(--line)]"
+          className="flex justify-end gap-2 px-6 py-3.5 border-t border-[var(--line)] shrink-0"
           style={{ background: 'color-mix(in oklab, var(--panel-2) 50%, var(--panel))' }}
         >
           <button
@@ -695,6 +718,7 @@ function AdjustQuantityModal({
             {saving ? <span className="loading loading-spinner loading-sm" /> : 'Update'}
           </button>
         </div>
+      </div>
       </div>
     </div>
   )
