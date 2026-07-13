@@ -119,6 +119,21 @@ const icons = {
   'shopping-cart': (p: SVGProps<SVGSVGElement>) => (
     <svg {...sp} {...p}><circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" /><path d="M1 1h4l2.7 12.3a2 2 0 0 0 2 1.7h9.7a2 2 0 0 0 2-1.7L23 6H6" /></svg>
   ),
+  'arrow-left': (p: SVGProps<SVGSVGElement>) => (
+    <svg {...sp} {...p}><path d="M19 12H5M12 19l-7-7 7-7" /></svg>
+  ),
+  'arrow-right': (p: SVGProps<SVGSVGElement>) => (
+    <svg {...sp} {...p}><path d="M5 12h14M12 5l7 7-7 7" /></svg>
+  ),
+  x: (p: SVGProps<SVGSVGElement>) => (
+    <svg {...sp} {...p}><path d="m18 6-12 12M6 6l12 12" /></svg>
+  ),
+  file: (p: SVGProps<SVGSVGElement>) => (
+    <svg {...sp} {...p}><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" /><polyline points="14 3 14 9 20 9" /></svg>
+  ),
+  clock: (p: SVGProps<SVGSVGElement>) => (
+    <svg {...sp} {...p}><circle cx="12" cy="12" r="9" /><polyline points="12 6 12 12 16 14" /></svg>
+  ),
 }
 
 export type IconName = keyof typeof icons

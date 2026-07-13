@@ -129,7 +129,7 @@ function VendorRow({
             type="checkbox"
             checked={vendor.is_active}
             onChange={(e) =>
-              toggleActive.mutate({ id: vendor.id, isActive: e.target.checked })
+              toggleActive.mutate({ id: Number(vendor.id), isActive: e.target.checked })
             }
             className="checkbox checkbox-sm"
             disabled={toggleActive.isPending}

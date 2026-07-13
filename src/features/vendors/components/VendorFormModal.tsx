@@ -76,13 +76,13 @@ export function VendorFormModal({ vendor, onClose }: VendorFormModalProps) {
     try {
       if (isEdit && vendor) {
         await updateVendor.mutateAsync({
-          id: vendor.id,
+          id: Number(vendor.id),
           values: values as VendorFormValues,
         })
-        toast('Vendor updated')
+        toast('Vendor updated', 'success')
       } else {
         await createVendor.mutateAsync(values as VendorFormValues)
-        toast('Vendor created')
+        toast('Vendor created', 'success')
       }
       onClose()
     } catch (err) {

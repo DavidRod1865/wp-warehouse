@@ -40,8 +40,12 @@ const InventoryPage = lazy(() => import('../features/inventory/components/Invent
 const LocationsPage = lazy(() => import('../features/inventory/components/LocationsPage'))
 const ReceivingPage = lazy(() => import('../features/receiving/components/ReceivingPage'))
 const ClientsPage = lazy(() => import('../features/clients/components/ClientsPage'))
+const ClientDetailPage = lazy(() => import('../features/clients/components/ClientDetailPage'))
 const VendorsPage = lazy(() => import('../features/vendors/components/VendorsPage'))
+const VendorDetailPage = lazy(() => import('../features/vendors/components/VendorDetailPage'))
 const ProjectsPage = lazy(() => import('../features/projects/components/ProjectsPage'))
+const PurchaseOrdersPage = lazy(() => import('../features/purchase-orders/components/PurchaseOrdersPage'))
+const PoDetailPage = lazy(() => import('../features/purchase-orders/components/PoDetailPage'))
 
 export const router = createBrowserRouter([
   // Public routes
@@ -62,8 +66,12 @@ export const router = createBrowserRouter([
           { path: '/inventory', element: <InventoryPage /> },
           { path: '/locations', element: <LocationsPage /> },
           { path: '/clients', element: <ClientsPage /> },
+          { path: '/clients/:id', element: <ClientDetailPage /> },
           { path: '/vendors', element: <VendorsPage /> },
+          { path: '/vendors/:id', element: <VendorDetailPage /> },
           { path: '/projects', element: <ProjectsPage /> },
+          { path: '/purchase-orders', element: <PurchaseOrdersPage /> },
+          { path: '/purchase-orders/:id', element: <PoDetailPage /> },
           { path: '/batches', element: <ComingSoon /> },
           { path: '/packing-lists', element: <ComingSoon /> },
           { path: '/receiving', element: <ReceivingPage /> },
