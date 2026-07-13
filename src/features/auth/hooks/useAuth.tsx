@@ -129,16 +129,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .subscribe()
     )
 
-    // Inventory update broadcasts → invalidate Sortly queries
-    channels.push(
-      supabase
-        .channel('inventory-updates')
-        .on('broadcast', { event: 'inventory_update' }, () => {
-          queryClient.invalidateQueries({ queryKey: ['sortly'] })
-        })
-        .subscribe()
-    )
-
     return () => {
       channels.forEach((ch) => supabase.removeChannel(ch))
     }

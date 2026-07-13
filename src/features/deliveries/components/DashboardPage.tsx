@@ -114,8 +114,8 @@ export default function DashboardPage() {
         deliveryId: deliveryToDelete.id,
         deliveryNumber: deliveryToDelete.delivery_number,
         status: deliveryToDelete.status,
-        truckSortlyFolderId: deliveryToDelete.truck_sortly_folder_id,
-        fromLocationId: deliveryToDelete.from_location_id,
+        truckSortlyFolderId: null,
+        fromLocationId: null,
         activityLog: deliveryToDelete.activity_log || [],
         deliveryItems: [],
         userId: user.id,
@@ -500,7 +500,7 @@ export default function DashboardPage() {
                 Are you sure you want to delete{' '}
                 <strong className="text-[var(--ink)]">{deliveryToDelete.delivery_number}</strong>?
                 {deliveryToDelete.status === 'pending' &&
-                  ' Items will be moved back to the warehouse in Sortly.'}
+                  ' Stock will be returned to the source location.'}
               </p>
             </div>
             <div className="flex justify-end gap-2 px-6 py-3.5 border-t border-[var(--line)]" style={{ background: 'color-mix(in oklab, var(--panel-2) 50%, var(--panel))' }}>

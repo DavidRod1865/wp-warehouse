@@ -10,6 +10,9 @@ interface DeliveryHeaderCardProps {
   errors: FieldErrors<DeliveryFormValues>
   projects: Project[]
   trucks: { id: number; name: string }[]
+  warehouseLocations: { id: number; name: string }[]
+  /** When true, delivery_number is shown as read-only (edit mode) */
+  deliveryNumber?: string
 }
 
 export function DeliveryHeaderCard({
@@ -18,6 +21,8 @@ export function DeliveryHeaderCard({
   errors,
   projects,
   trucks,
+  warehouseLocations,
+  deliveryNumber,
 }: DeliveryHeaderCardProps) {
   return (
     <div
@@ -26,14 +31,16 @@ export function DeliveryHeaderCard({
     >
       <div className="p-5">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <FormField label="Delivery #">
-            <input
-              {...register('delivery_number')}
-              className="form-input"
-              readOnly
-              style={{ opacity: 0.7 }}
-            />
-          </FormField>
+          {deliveryNumber && (
+            <FormField label="Delivery #">
+              <input
+                value={deliveryNumber}
+                readOnly
+                className="form-input"
+                style={{ opacity: 0.7 }}
+              />
+            </FormField>
+          )}
 
           <FormField label="PO Reference">
             <input
@@ -62,13 +69,32 @@ export function DeliveryHeaderCard({
             />
           </FormField>
 
-          <FormField label="Truck" error={errors.truck_folder_id?.message}>
+          <FormField label="Source Location" error={errors.from_location_id?.message}>
             <Controller
-              name="truck_folder_id"
+              name="from_location_id"
               control={control}
               render={({ field }) => (
                 <select
-                  className={`form-input ${errors.truck_folder_id ? 'border-[var(--danger)]' : ''}`}
+                  className={`form-input ${errors.from_location_id ? 'border-[var(--danger)]' : ''}`}
+                  value={field.value ?? ''}
+                  onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
+                >
+                  <option value="">Select warehouse…</option>
+                  {warehouseLocations.map((l) => (
+                    <option key={l.id} value={l.id}>{l.name}</option>
+                  ))}
+                </select>
+              )}
+            />
+          </FormField>
+
+          <FormField label="Truck" error={errors.truck_location_id?.message}>
+            <Controller
+              name="truck_location_id"
+              control={control}
+              render={({ field }) => (
+                <select
+                  className={`form-input ${errors.truck_location_id ? 'border-[var(--danger)]' : ''}`}
                   value={field.value ?? ''}
                   onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
                 >

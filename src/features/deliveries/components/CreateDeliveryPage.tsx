@@ -1,14 +1,13 @@
 /**
  * CreateDeliveryPage — New delivery creation
  *
- * Generates a delivery number, renders the form, and handles
- * the create mutation (Sortly copy + Supabase insert).
+ * Phase 5+: Delivery number is generated server-side by the create_delivery RPC.
+ * No client-side number generation, no Sortly.
  */
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/hooks/useAuth'
 import { useCreateDelivery } from '../hooks/useDeliveryMutations'
-import { generateDeliveryNumber } from '../utils/deliveryNumber'
 import { DeliveryForm } from './DeliveryForm'
 import type { DeliveryFormValues } from '../schemas/deliverySchema'
 
@@ -16,38 +15,25 @@ export default function CreateDeliveryPage() {
   const { user, profile } = useAuth()
   const navigate = useNavigate()
   const createDelivery = useCreateDelivery()
-  const [deliveryNumber, setDeliveryNumber] = useState<string>('')
   const [savingStatus, setSavingStatus] = useState('')
-
-  useEffect(() => {
-    generateDeliveryNumber().then(setDeliveryNumber)
-  }, [])
 
   const handleSubmit = async (data: DeliveryFormValues) => {
     if (!user) return
 
     try {
-      setSavingStatus('Copying items to truck in Sortly...')
-      const delivery = await createDelivery.mutateAsync({
+      setSavingStatus('Creating delivery and loading truck…')
+      const result = await createDelivery.mutateAsync({
         formValues: data,
         userId: user.id,
         userEmail: user.email || '',
         userName: profile?.name || undefined,
       })
-      navigate(`/deliveries/${delivery.id}`)
+      navigate(`/deliveries/${result.delivery_id}`)
     } catch (err) {
       console.error('Failed to create delivery:', err)
       setSavingStatus('')
       throw err
     }
-  }
-
-  if (!deliveryNumber) {
-    return (
-      <div className="flex justify-center py-12">
-        <span className="loading loading-spinner loading-lg" />
-      </div>
-    )
   }
 
   return (
@@ -63,12 +49,11 @@ export default function CreateDeliveryPage() {
           className="text-[var(--muted)] mt-1"
           style={{ fontFamily: 'var(--mono)', fontSize: 12 }}
         >
-          {deliveryNumber} &middot; draft
+          Number generated on save &middot; draft
         </div>
       </div>
 
       <DeliveryForm
-        defaultValues={{ delivery_number: deliveryNumber }}
         onSubmit={handleSubmit}
         isSaving={createDelivery.isPending}
         savingStatus={savingStatus}

@@ -13,15 +13,22 @@ interface UseStockLevelsOptions {
 }
 
 async function fetchStockLevels(locationId?: number): Promise<StockLevel[]> {
-  let query = supabase.from('stock_levels').select('*')
-
   if (locationId) {
-    query = query.eq('location_id', locationId)
+    // Join item data for name/part# display when filtering by location
+    const { data, error } = await supabase
+      .from('stock_levels')
+      .select('*, item:items(id, name, part_number)')
+      .eq('location_id', locationId)
+      .order('updated_at', { ascending: false })
+
+    if (error) throw error
+    return (data || []) as unknown as StockLevel[]
   }
 
-  query = query.order('updated_at', { ascending: false })
-
-  const { data, error } = await query
+  const { data, error } = await supabase
+    .from('stock_levels')
+    .select('*')
+    .order('updated_at', { ascending: false })
 
   if (error) throw error
   return (data || []) as StockLevel[]

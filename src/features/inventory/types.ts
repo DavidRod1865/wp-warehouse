@@ -1,18 +1,5 @@
-// Re-export Sortly types for backward compatibility (receiving/deliveries still use them)
-export type {
-  SortlyItem,
-  SortlyApiResponse,
-  SortlyPhoto,
-  SortlyTag,
-  CreateItemParams,
-  CopyItemParams,
-  SearchItemsParams,
-  SortlyCustomField,
-  SortlyAlert,
-} from '../../types/sortly'
-
 // ============================================================================
-// NEW INVENTORY CORE TYPES (Supabase-based)
+// INVENTORY CORE TYPES (Supabase-based, Phase 1+)
 // ============================================================================
 
 export interface Location {
@@ -42,9 +29,9 @@ export interface StockLevel {
   item_id: number
   quantity: number
   updated_at: string
-  // Joined data
+  // Joined data (available when selected with join)
   location?: Location
-  item?: InventoryItem
+  item?: Pick<InventoryItem, 'id' | 'name' | 'part_number'> | null
 }
 
 export interface InventoryMovement {

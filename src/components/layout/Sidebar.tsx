@@ -1,14 +1,13 @@
 /**
  * Sidebar — Manager navigation matching the hi-fi design.
  *
- * Brand mark, grouped nav sections, Sortly sync status, user avatar.
+ * Brand mark, grouped nav sections, user avatar.
  * Collapses to hamburger on mobile.
  */
 import { NavLink } from 'react-router-dom'
 import { useState } from 'react'
 import { useAuth } from '../../features/auth/hooks/useAuth'
 import { Icon } from '../ui/Icon'
-import { SortlyStatusPill } from './SortlyStatusPill'
 import type { IconName } from '../ui/Icon'
 import warehouseIcon from '../../assets/warehouse-icon.png'
 
@@ -149,9 +148,6 @@ export function Sidebar() {
 
         {/* Footer */}
         <div className="mt-auto px-4 pb-3.5 pt-3.5 border-t border-[var(--line)]">
-          {/* Sortly sync */}
-          <SortlyStatusPill showDetail />
-
           {/* User */}
           <div className="flex items-center gap-2.5 mt-2.5 px-1 py-1.5">
             <div className="w-[30px] h-[30px] rounded-full bg-gradient-to-br from-[#4a5578] to-[#1a2338] text-white grid place-items-center font-semibold text-xs shrink-0">

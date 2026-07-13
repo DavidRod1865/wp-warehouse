@@ -6,10 +6,8 @@
 import { Outlet } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { Topbar } from './Topbar'
-import { useSortlyPing } from '../../hooks/useSortlyPing'
 
 export function ManagerLayout() {
-  useSortlyPing()
   return (
     <div className="flex min-h-screen">
       <Sidebar />
