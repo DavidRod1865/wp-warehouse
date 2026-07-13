@@ -40,6 +40,7 @@ const fieldNav: NavItem[] = [
 const dataNav: NavItem[] = [
   { to: '/analytics', label: 'Reports', icon: 'chart' },
   { to: '/activity', label: 'Activity', icon: 'settings' },
+  { to: '/audit', label: 'Audit', icon: 'clipboard' },
 ]
 
 function NavSection({ title, items, onClose }: { title: string; items: NavItem[]; onClose: () => void }) {

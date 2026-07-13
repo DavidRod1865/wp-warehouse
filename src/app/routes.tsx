@@ -46,6 +46,7 @@ const VendorDetailPage = lazy(() => import('../features/vendors/components/Vendo
 const ProjectsPage = lazy(() => import('../features/projects/components/ProjectsPage'))
 const PurchaseOrdersPage = lazy(() => import('../features/purchase-orders/components/PurchaseOrdersPage'))
 const PoDetailPage = lazy(() => import('../features/purchase-orders/components/PoDetailPage'))
+const AuditPage = lazy(() => import('../features/audit/components/AuditPage'))
 
 export const router = createBrowserRouter([
   // Public routes
@@ -78,6 +79,7 @@ export const router = createBrowserRouter([
           { path: '/analytics', element: <ComingSoon /> },
           { path: '/users', element: <ComingSoon /> },
           { path: '/activity', element: <ComingSoon /> },
+          { path: '/audit', element: <AuditPage /> },
         ],
       },
     ],
