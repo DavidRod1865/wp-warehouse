@@ -1,72 +1,63 @@
 /**
- * useProjectItems — Fetch items in a project's warehouse subfolder
+ * useProjectItems (Phase 4 — inventory-backed)
  *
- * Used for auto-matching parsed packing list items against existing
- * Sortly items in a project. Returns items + a fuzzy matcher.
+ * Replaces the Sortly-backed version. Returns all inventory items with
+ * the same fuzzy-match interface as the previous implementation.
+ *
+ * The `folderId` parameter is kept for API compat but is no longer used.
  */
 import { useMemo } from 'react'
-import { useItems } from '../../inventory/hooks/useItems'
-import type { SortlyItem } from '../../../types/sortly'
+import { useInventoryItems } from '../../inventory/hooks/useInventoryItems'
+import type { InventoryItem } from '../../inventory/types'
 
-/**
- * Normalize a string for fuzzy matching: lowercase, trim, collapse whitespace.
- */
+export interface ItemMatch {
+  item: InventoryItem
+  score: number
+}
+
 function normalize(s: string): string {
   return s.toLowerCase().trim().replace(/\s+/g, ' ')
 }
 
-/**
- * Simple fuzzy match: checks if all words in the query appear in the target.
- * Returns a score (0-1) based on character overlap.
- */
-function matchScore(query: string, target: string): number {
+function matchScore(query: string, target: string, partNumber?: string | null): number {
   const q = normalize(query)
   const t = normalize(target)
 
-  // Exact match
-  if (q === t) return 1
+  if (q === t) return 1.0
 
-  // Check if all query words appear in target
   const queryWords = q.split(' ')
-  const allWordsMatch = queryWords.every((w) => t.includes(w))
-  if (allWordsMatch) return 0.8
+  if (queryWords.every((w) => t.includes(w))) return 0.8
 
-  // Partial: check how many words match
   const matchedWords = queryWords.filter((w) => t.includes(w))
   if (matchedWords.length > 0) {
     return (matchedWords.length / queryWords.length) * 0.6
   }
 
+  if (partNumber) {
+    const pn = normalize(partNumber)
+    if (pn === q) return 0.75
+    if (q.includes(pn) || pn.includes(q)) return 0.5
+  }
+
   return 0
 }
 
-export interface ItemMatch {
-  item: SortlyItem
-  score: number
-}
-
-export function useProjectItems(folderId: number | null | undefined) {
-  const { data: items, isLoading, error } = useItems(folderId)
+/** @param _folderId Unused — kept for API compat with previous Sortly version */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function useProjectItems(_folderId?: number | null) {
+  const { data: items = [], isLoading, error } = useInventoryItems()
 
   const findMatches = useMemo(() => {
-    if (!items) return (_name: string) => [] as ItemMatch[]
-
     return (itemName: string, threshold = 0.5): ItemMatch[] => {
-      const matches: ItemMatch[] = []
-
-      for (const item of items) {
-        const score = matchScore(itemName, item.name)
-        if (score >= threshold) {
-          matches.push({ item, score })
-        }
-      }
-
-      return matches.sort((a, b) => b.score - a.score)
+      return items
+        .map((item) => ({ item, score: matchScore(itemName, item.name, item.part_number) }))
+        .filter((r) => r.score >= threshold)
+        .sort((a, b) => b.score - a.score)
     }
   }, [items])
 
   return {
-    items: items || [],
+    items,
     isLoading,
     error,
     findMatches,

@@ -4,10 +4,12 @@ import type { DeliveryFormValues } from '../schemas/deliverySchema'
 export function FormField({
   label,
   error,
+  required,
   children,
 }: {
   label: string
   error?: string
+  required?: boolean
   children: React.ReactNode
 }) {
   return (
@@ -21,7 +23,7 @@ export function FormField({
           textTransform: 'uppercase',
         }}
       >
-        {label}
+        {label} {required && <span className="text-[var(--danger)]">*</span>}
       </div>
       {children}
       {error && (

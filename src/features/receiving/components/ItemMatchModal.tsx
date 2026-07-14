@@ -1,27 +1,27 @@
 /**
- * ItemMatchModal — Browse Sortly warehouse folders to link a receiving item
+ * ItemMatchModal (Phase 4 — inventory-backed)
  *
- * Used in warehouse-destination mode. User navigates folder tree, selects
- * an existing item (to update qty) or picks a folder (to create new).
+ * Matching priority:
+ *  1. Open PO lines (if a PO is linked) — auto-suggests by part_number exact,
+ *     then name contains. Shows ordered vs already-received.
+ *  2. Existing inventory items (useInventoryItems search).
+ *  3. Create new item (no folder browsing — that's a Sortly concept).
+ *
+ * No Sortly imports.
  */
 import { useState, useEffect } from 'react'
-import { useSubfolders } from '../../inventory/hooks/useFolders'
-import { useItems } from '../../inventory/hooks/useItems'
+import { useInventoryItems } from '../../inventory/hooks/useInventoryItems'
 import { Icon } from '../../../components/ui/Icon'
-import type { SortlyItem } from '../../../types/sortly'
+import type { InventoryItem } from '../../inventory/types'
+import type { POLineSuggestion } from '../types'
 
 interface ItemMatchResult {
-  sortly_item_id: number | null
-  sortly_item_name: string | null
-  sortly_current_quantity: number | null
-  destination_folder_id: number
-  destination_folder_name: string
+  item_id: number | null
+  item_name_linked: string | null
+  current_stock_quantity: number | null
+  po_line_item_id: number | null
+  po_line_suggestion: POLineSuggestion | null
   action: 'update' | 'create'
-}
-
-interface RootEntry {
-  id: number
-  label: string
 }
 
 interface ItemMatchModalProps {
@@ -29,12 +29,9 @@ interface ItemMatchModalProps {
   onClose: () => void
   onSelect: (result: ItemMatchResult) => void
   itemName: string
-  mainWarehouseFolderId: number | null
-  rootFolderLabel?: string
-  additionalRoots?: RootEntry[]
-  defaultFolderId?: number | null
-  defaultFolderName?: string | null
-  highlightedRootId?: number | null
+  partNumber: string | null
+  /** PO lines from the linked PO (empty array if no PO linked) */
+  poLines: POLineSuggestion[]
 }
 
 export function ItemMatchModal({
@@ -42,76 +39,109 @@ export function ItemMatchModal({
   onClose,
   onSelect,
   itemName,
-  mainWarehouseFolderId,
-  rootFolderLabel = 'Warehouse Root',
-  additionalRoots = [],
-  defaultFolderId = null,
-  defaultFolderName = null,
-  highlightedRootId = null,
+  partNumber,
+  poLines,
 }: ItemMatchModalProps) {
-  const [selectedFolderId, setSelectedFolderId] = useState<number | null>(null)
-  const [selectedFolderName, setSelectedFolderName] = useState<string>('')
+  const [search, setSearch] = useState('')
+  const [activeTab, setActiveTab] = useState<'po' | 'items' | 'new'>('po')
 
-  const { data: items, isLoading: itemsLoading } = useItems(selectedFolderId)
+  const { data: searchResults = [], isLoading: searchLoading } = useInventoryItems({
+    search: search.length >= 2 ? search : itemName.length >= 2 ? itemName : undefined,
+  })
 
+  // Auto-focus right tab on open
   useEffect(() => {
-    if (isOpen) {
-      setSelectedFolderId(defaultFolderId ?? null)
-      setSelectedFolderName(defaultFolderName ?? '')
-    }
-  }, [isOpen]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (!isOpen) return
+    setSearch('')
+    setActiveTab(poLines.length > 0 ? 'po' : 'items')
+  }, [isOpen, poLines.length])
 
   if (!isOpen) return null
 
-  const allItems = items || []
-  const subfolders = allItems.filter((item) => item.type === 'folder')
-  const availableItems = allItems.filter((item) => item.type !== 'folder')
+  // ── PO line auto-suggestion ────────────────────────────────────────────────
 
-  const handleSelectItem = (item: SortlyItem) => {
+  function scorePOLine(line: POLineSuggestion): number {
+    // Exact part_number match → highest priority
+    if (partNumber && line.part_number) {
+      if (partNumber.toLowerCase().trim() === line.part_number.toLowerCase().trim()) return 1.0
+      if (line.part_number.toLowerCase().includes(partNumber.toLowerCase().trim())) return 0.75
+    }
+    // Name contains
+    const q = itemName.toLowerCase()
+    const t = line.description.toLowerCase()
+    if (q === t) return 0.9
+    const words = q.split(' ')
+    if (words.every((w) => t.includes(w))) return 0.7
+    const matched = words.filter((w) => t.includes(w))
+    if (matched.length > 0) return (matched.length / words.length) * 0.5
+    return 0
+  }
+
+  const scoredPoLines = poLines
+    .map((line) => ({ line, score: scorePOLine(line) }))
+    .sort((a, b) => b.score - a.score)
+
+  const handleSelectPOLine = (line: POLineSuggestion) => {
     onSelect({
-      sortly_item_id: item.id,
-      sortly_item_name: item.name,
-      sortly_current_quantity: item.quantity ?? 0,
-      destination_folder_id: selectedFolderId!,
-      destination_folder_name: selectedFolderName,
+      item_id: line.item_id ?? null,
+      item_name_linked: line.description,
+      current_stock_quantity: null,
+      po_line_item_id: line.po_line_item_id,
+      po_line_suggestion: line,
       action: 'update',
     })
     onClose()
   }
 
-  const handleCreateInFolder = () => {
-    if (!selectedFolderId) return
+  const handleSelectItem = (item: InventoryItem) => {
     onSelect({
-      sortly_item_id: null,
-      sortly_item_name: null,
-      sortly_current_quantity: null,
-      destination_folder_id: selectedFolderId,
-      destination_folder_name: selectedFolderName,
+      item_id: item.id,
+      item_name_linked: item.name,
+      current_stock_quantity: null,
+      po_line_item_id: null,
+      po_line_suggestion: null,
+      action: 'update',
+    })
+    onClose()
+  }
+
+  const handleCreateNew = () => {
+    onSelect({
+      item_id: null,
+      item_name_linked: null,
+      current_stock_quantity: null,
+      po_line_item_id: null,
+      po_line_suggestion: null,
       action: 'create',
     })
     onClose()
   }
 
+  const tabs = [
+    ...(poLines.length > 0 ? [{ id: 'po' as const, label: `PO Lines (${poLines.length})` }] : []),
+    { id: 'items' as const, label: 'Inventory Items' },
+    { id: 'new' as const, label: 'Create New' },
+  ]
+
   return (
     <div
-      className="fixed inset-0 z-50 grid place-items-center p-10"
+      className="fixed inset-0 z-[60] overflow-y-auto overscroll-contain"
       style={{
         background: 'color-mix(in oklab, var(--ink) 35%, transparent)',
         backdropFilter: 'blur(4px)',
       }}
-      onClick={onClose}
     >
+      <div className="flex min-h-full items-start justify-center p-4 sm:p-6 sm:items-center">
       <div
-        className="bg-[var(--panel)] rounded-xl flex flex-col overflow-hidden"
+        className="bg-[var(--panel)] rounded-xl flex flex-col overflow-hidden my-4 sm:my-0"
         style={{
-          width: 'min(900px, calc(100vw - 80px))',
-          maxHeight: 'calc(100vh - 80px)',
+          width: 'min(760px, calc(100vw - 32px))',
+          maxHeight: 'min(720px, calc(100dvh - 32px))',
           boxShadow: '0 20px 60px -20px rgba(15,23,41,.35), 0 0 0 1px var(--line)',
         }}
-        onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--line)]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--line)] shrink-0">
           <div>
             <div
               className="text-[var(--ink)]"
@@ -120,7 +150,10 @@ export function ItemMatchModal({
               Link item to inventory
             </div>
             <div className="text-[var(--muted)] text-xs mt-0.5">
-              Find <b className="text-[var(--ink-2)]">{itemName}</b> in the warehouse, or pick a folder to create it
+              Matching <b className="text-[var(--ink-2)]">{itemName}</b>
+              {partNumber && (
+                <span className="ml-1 font-mono">#{partNumber}</span>
+              )}
             </div>
           </div>
           <button
@@ -131,292 +164,188 @@ export function ItemMatchModal({
           </button>
         </div>
 
-        {/* Body */}
-        <div className="flex flex-1 min-h-0">
-          {/* Folder tree */}
-          <div className="w-[240px] border-r border-[var(--line)] overflow-y-auto p-3">
-            <div
-              className="text-[var(--muted)] mb-2 px-2"
+        {/* Tabs */}
+        <div className="flex border-b border-[var(--line)] px-6 shrink-0">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className="px-4 py-2.5 text-sm font-medium border-b-2 transition-colors"
               style={{
-                fontFamily: 'var(--mono)',
-                fontSize: 10,
-                letterSpacing: '.1em',
-                textTransform: 'uppercase',
+                borderBottomColor: activeTab === tab.id ? 'var(--signal)' : 'transparent',
+                color: activeTab === tab.id ? 'var(--signal)' : 'var(--muted)',
               }}
             >
-              Folders
-            </div>
-            <div className="space-y-px">
-              {mainWarehouseFolderId && (
-                <RootSection
-                  root={{ id: mainWarehouseFolderId, label: rootFolderLabel }}
-                  selectedId={selectedFolderId}
-                  highlighted={highlightedRootId === mainWarehouseFolderId}
-                  defaultExpanded={highlightedRootId === mainWarehouseFolderId}
-                  onSelect={(id, name) => {
-                    setSelectedFolderId(id)
-                    setSelectedFolderName(name)
-                  }}
-                />
-              )}
+              {tab.label}
+            </button>
+          ))}
+        </div>
 
-              {/* Additional roots (other projects) */}
-              {additionalRoots.map((root) => (
-                <RootSection
-                  key={root.id}
-                  root={root}
-                  selectedId={selectedFolderId}
-                  highlighted={highlightedRootId === root.id}
-                  defaultExpanded={highlightedRootId === root.id}
-                  onSelect={(id, name) => {
-                    setSelectedFolderId(id)
-                    setSelectedFolderName(name)
-                  }}
-                />
-              ))}
-            </div>
-          </div>
-
-          {/* Item list */}
-          <div className="flex-1 overflow-y-auto p-4">
-            {!selectedFolderId ? (
-              <p className="text-sm text-[var(--muted)] text-center py-8">
-                Select a folder to browse items
-              </p>
-            ) : itemsLoading ? (
-              <div className="flex justify-center py-8">
-                <span className="loading loading-spinner loading-sm" />
-              </div>
-            ) : (
-              <>
-                {/* Subfolders — click to navigate into them */}
-                {subfolders.length > 0 && (
-                  <div className="mb-3 space-y-px">
+        {/* Body */}
+        <div className="flex-1 min-h-0 overflow-y-auto p-4">
+          {/* ── Tab: PO Lines ── */}
+          {activeTab === 'po' && (
+            <div className="space-y-2">
+              {scoredPoLines.length === 0 ? (
+                <p className="text-sm text-[var(--muted)] text-center py-8">
+                  No open PO lines available
+                </p>
+              ) : (
+                scoredPoLines.map(({ line, score }) => {
+                  const isOverReceived = line.quantity_already_received >= line.quantity_ordered
+                  const isSuggested = score >= 0.5
+                  return (
                     <div
-                      className="text-[var(--muted)] mb-1.5 px-1"
-                      style={{ fontFamily: 'var(--mono)', fontSize: 10, letterSpacing: '.1em', textTransform: 'uppercase' }}
+                      key={line.po_line_item_id}
+                      className="flex items-center gap-3 px-4 py-3 rounded-lg cursor-pointer transition-colors border"
+                      style={{
+                        background: isSuggested
+                          ? 'color-mix(in oklab, var(--ok) 6%, var(--panel))'
+                          : 'var(--panel)',
+                        borderColor: isSuggested
+                          ? 'color-mix(in oklab, var(--ok) 25%, var(--line))'
+                          : 'var(--line)',
+                      }}
+                      onClick={() => handleSelectPOLine(line)}
                     >
-                      Subfolders
-                    </div>
-                    {subfolders.map((folder) => (
-                      <button
-                        key={folder.id}
-                        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-left hover:bg-[var(--panel-2)] transition-colors group"
-                        onClick={() => {
-                          setSelectedFolderId(folder.id)
-                          setSelectedFolderName(folder.name)
-                        }}
-                      >
-                        <span className="text-[var(--muted)] group-hover:text-[var(--ink-2)] text-xs">▸</span>
-                        <span className="font-medium text-[var(--ink-2)] group-hover:text-[var(--ink)]">{folder.name}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {availableItems.length === 0 && subfolders.length === 0 ? (
-                  <p className="text-sm text-[var(--muted)] text-center py-8">
-                    No items in this folder
-                  </p>
-                ) : availableItems.length > 0 ? (
-                  <div className="space-y-1 mb-4">
-                    {subfolders.length > 0 && (
-                      <div
-                        className="text-[var(--muted)] mb-1.5 px-1"
-                        style={{ fontFamily: 'var(--mono)', fontSize: 10, letterSpacing: '.1em', textTransform: 'uppercase' }}
-                      >
-                        Items
-                      </div>
-                    )}
-                    {availableItems.map((item) => {
-                      const brand = item.custom_attribute_values?.find(
-                        (a) => a.custom_attribute_name.toLowerCase() === 'brand'
-                      )?.value
-                      const partNum = item.custom_attribute_values?.find(
-                        (a) => a.custom_attribute_name.toLowerCase() === 'part number'
-                      )?.value
-
-                      return (
-                        <div
-                          key={item.id}
-                          className="flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer hover:bg-[var(--panel-2)] transition-colors border border-transparent hover:border-[var(--line)]"
-                          onClick={() => handleSelectItem(item)}
-                        >
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-[var(--ink)] truncate">
-                              {item.name}
-                            </p>
-                            <div className="flex items-center gap-3 mt-0.5">
-                              {brand && (
-                                <span
-                                  className="text-[var(--muted)]"
-                                  style={{ fontFamily: 'var(--mono)', fontSize: 11 }}
-                                >
-                                  {brand}
-                                </span>
-                              )}
-                              {partNum && (
-                                <span
-                                  className="text-[var(--muted)]"
-                                  style={{ fontFamily: 'var(--mono)', fontSize: 11 }}
-                                >
-                                  #{partNum}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          <span
-                            className="text-[var(--ink-2)] shrink-0"
-                            style={{ fontFamily: 'var(--mono)', fontSize: 13, fontWeight: 500 }}
-                          >
-                            Qty: {item.quantity ?? 0}
-                          </span>
-                          <span className="text-xs text-[var(--signal)] font-medium shrink-0">
-                            Select →
-                          </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium text-[var(--ink)] truncate">
+                            {line.description}
+                          </p>
+                          {isSuggested && (
+                            <span
+                              className="shrink-0 text-xs font-medium px-1.5 py-0.5 rounded"
+                              style={{ background: 'var(--ok-soft)', color: 'var(--ok)' }}
+                            >
+                              Suggested
+                            </span>
+                          )}
+                          {isOverReceived && (
+                            <span
+                              className="shrink-0 text-xs font-medium px-1.5 py-0.5 rounded"
+                              style={{ background: 'var(--warn-soft)', color: 'var(--warn)' }}
+                            >
+                              Fully received
+                            </span>
+                          )}
                         </div>
-                      )
-                    })}
-                  </div>
-                ) : null}
+                        {line.part_number && (
+                          <p
+                            className="text-xs mt-0.5"
+                            style={{ fontFamily: 'var(--mono)', color: 'var(--muted)' }}
+                          >
+                            #{line.part_number}
+                          </p>
+                        )}
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <div
+                          className="text-xs"
+                          style={{ fontFamily: 'var(--mono)', color: 'var(--muted)' }}
+                        >
+                          {line.quantity_already_received} / {line.quantity_ordered} received
+                        </div>
+                        <div
+                          className="text-xs font-medium mt-0.5"
+                          style={{
+                            color: line.quantity_remaining <= 0 ? 'var(--ok)' : 'var(--signal)',
+                          }}
+                        >
+                          {line.quantity_remaining > 0
+                            ? `${line.quantity_remaining} remaining`
+                            : 'Complete'}
+                        </div>
+                      </div>
+                      <Icon name="chevron-right" className="w-4 h-4 text-[var(--muted)] shrink-0" />
+                    </div>
+                  )
+                })
+              )}
+            </div>
+          )}
 
-                {/* Create new in this folder */}
-                <button
-                  onClick={handleCreateInFolder}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 border-dashed border-[var(--line)] text-sm font-medium text-[var(--ink-2)] hover:border-[var(--signal)] hover:text-[var(--signal)] transition-colors"
-                >
-                  <Icon name="plus" className="w-4 h-4" />
-                  Create new item in "{selectedFolderName}"
-                </button>
-              </>
-            )}
-          </div>
+          {/* ── Tab: Inventory Items ── */}
+          {activeTab === 'items' && (
+            <div className="space-y-3">
+              <input
+                className="form-input w-full"
+                placeholder={`Search inventory... (pre-filled: "${itemName}")`}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                autoFocus
+              />
+              {searchLoading ? (
+                <div className="flex justify-center py-8">
+                  <span className="loading loading-spinner loading-sm" />
+                </div>
+              ) : searchResults.length === 0 ? (
+                <p className="text-sm text-[var(--muted)] text-center py-6">
+                  {search.length >= 2 || itemName.length >= 2
+                    ? 'No matching items found'
+                    : 'Type to search'}
+                </p>
+              ) : (
+                <div className="space-y-1">
+                  {searchResults.map((item) => (
+                    <div
+                      key={item.id}
+                      className="flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer hover:bg-[var(--panel-2)] transition-colors border border-transparent hover:border-[var(--line)]"
+                      onClick={() => handleSelectItem(item)}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-[var(--ink)] truncate">{item.name}</p>
+                        {item.part_number && (
+                          <p
+                            className="text-xs mt-0.5"
+                            style={{ fontFamily: 'var(--mono)', color: 'var(--muted)' }}
+                          >
+                            #{item.part_number}
+                          </p>
+                        )}
+                      </div>
+                      <span className="text-xs text-[var(--signal)] font-medium shrink-0">
+                        Select →
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Tab: Create New ── */}
+          {activeTab === 'new' && (
+            <div className="py-6 text-center space-y-4">
+              <div
+                className="w-12 h-12 rounded-xl grid place-items-center mx-auto"
+                style={{ background: 'var(--info-soft)', border: '1px solid color-mix(in oklab, var(--info) 30%, var(--line))' }}
+              >
+                <Icon name="plus" className="w-5 h-5" style={{ color: 'var(--info)' }} />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-[var(--ink)]">
+                  Create new inventory item
+                </p>
+                <p className="text-sm text-[var(--muted)] mt-1">
+                  "<b>{itemName}</b>" will be added to your inventory catalog when confirmed.
+                  {partNumber && (
+                    <span> Part number <b>#{partNumber}</b> will be saved.</span>
+                  )}
+                </p>
+              </div>
+              <button
+                onClick={handleCreateNew}
+                className="px-5 py-2.5 rounded-lg text-sm font-medium text-white"
+                style={{ background: 'var(--info)' }}
+              >
+                Create "{itemName}"
+              </button>
+            </div>
+          )}
         </div>
       </div>
-    </div>
-  )
-}
-
-// ── Root section (project folder with its subfolders) ──
-
-function RootSection({
-  root,
-  selectedId,
-  onSelect,
-  highlighted = false,
-  defaultExpanded = false,
-}: {
-  root: RootEntry
-  selectedId: number | null
-  onSelect: (id: number, name: string) => void
-  highlighted?: boolean
-  defaultExpanded?: boolean
-}) {
-  const [expanded, setExpanded] = useState(defaultExpanded)
-  const { data: children, isLoading } = useSubfolders(expanded ? root.id : null)
-
-  return (
-    <div>
-      <div className="flex items-center gap-1 mt-1">
-        <button
-          className="w-5 h-5 grid place-items-center text-[var(--muted)] hover:text-[var(--ink)] shrink-0"
-          onClick={() => setExpanded(!expanded)}
-          style={{ fontSize: 10 }}
-        >
-          {isLoading ? (
-            <span className="loading loading-spinner" style={{ width: 10, height: 10 }} />
-          ) : expanded ? '▾' : '▸'}
-        </button>
-        <button
-          className={`flex-1 text-left text-sm truncate py-1.5 px-1.5 rounded transition-colors font-medium ${
-            selectedId === root.id
-              ? 'bg-[var(--panel-2)] text-[var(--ink)]'
-              : 'text-[var(--ink-2)] hover:bg-[var(--panel-2)]'
-          }`}
-          style={highlighted ? { outline: '1.5px solid var(--signal)', outlineOffset: '-1px' } : undefined}
-          onClick={() => {
-            onSelect(root.id, root.label)
-            setExpanded((v) => !v)
-          }}
-        >
-          {root.label}
-        </button>
       </div>
-      {expanded && (children || []).map((child) => (
-        <LazyFolderNode
-          key={child.id}
-          folder={child}
-          selectedId={selectedId}
-          onSelect={onSelect}
-          depth={1}
-        />
-      ))}
-    </div>
-  )
-}
-
-// ── Lazy-loading folder tree node ──
-
-function LazyFolderNode({
-  folder,
-  selectedId,
-  onSelect,
-  depth = 0,
-}: {
-  folder: SortlyItem
-  selectedId: number | null
-  onSelect: (id: number, name: string) => void
-  depth?: number
-}) {
-  const [expanded, setExpanded] = useState(false)
-  const { data: children, isLoading } = useSubfolders(expanded ? folder.id : null)
-  const isSelected = selectedId === folder.id
-  const hasChildren = children && children.length > 0
-
-  return (
-    <div>
-      <div
-        className="flex items-center gap-1 rounded-md transition-colors"
-        style={{ paddingLeft: `${depth * 12 + 4}px` }}
-      >
-        <button
-          className="w-5 h-5 grid place-items-center text-[var(--muted)] hover:text-[var(--ink)] shrink-0"
-          onClick={(e) => {
-            e.stopPropagation()
-            setExpanded(!expanded)
-          }}
-          style={{ fontSize: 10 }}
-        >
-          {isLoading ? (
-            <span className="loading loading-spinner" style={{ width: 10, height: 10 }} />
-          ) : expanded && hasChildren ? (
-            '▾'
-          ) : (
-            '▸'
-          )}
-        </button>
-        <button
-          className={`flex-1 text-left text-sm truncate py-1.5 px-1.5 rounded transition-colors ${
-            isSelected
-              ? 'bg-[var(--panel-2)] text-[var(--ink)] font-medium'
-              : 'text-[var(--ink-2)] hover:bg-[var(--panel-2)]'
-          }`}
-          onClick={() => onSelect(folder.id, folder.name)}
-        >
-          {folder.name}
-        </button>
-      </div>
-      {expanded &&
-        hasChildren &&
-        children.map((child) => (
-          <LazyFolderNode
-            key={child.id}
-            folder={child}
-            selectedId={selectedId}
-            onSelect={onSelect}
-            depth={depth + 1}
-          />
-        ))}
     </div>
   )
 }

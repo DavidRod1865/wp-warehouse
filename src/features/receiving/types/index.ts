@@ -19,6 +19,8 @@ export interface ReceivingEntry {
   project_name: string | null
   vendor: string
   po_number: string | null
+  /** Phase 4+: linked purchase order id */
+  po_id: number | null
   raw_content: string | null
   file_url: string | null
   file_name: string | null
@@ -28,7 +30,10 @@ export interface ReceivingEntry {
   sort_order: number
   status: ReceiptStatus
   destination_type: DestinationType | null
+  /** Legacy Sortly field — kept for old rows, ignored in new code */
   destination_folder_id: number | null
+  /** Phase 4+: inventory location id */
+  destination_location_id: number | null
   date_received: string | null
   created_at: string
 }
@@ -37,15 +42,26 @@ export interface ReceivingEntry {
 export interface ReceivingItem {
   id: number
   receiving_entry_id: number
+  /** Phase 4+: PO line item linked to this row */
+  po_line_item_id: number | null
+  /** Phase 4+: inventory item id */
+  item_id: number | null
+  /** Legacy Sortly field — kept for old rows */
   sortly_item_id: number | null
   item_name: string
   part_number: string | null
   quantity_received: number
   action: ItemAction
+  /** Legacy Sortly field — kept for old rows */
   sortly_quantity_before: number | null
+  /** Legacy Sortly field — kept for old rows */
   sortly_quantity_after: number | null
+  /** Legacy Sortly field — kept for old rows */
   destination_folder_id: number | null
+  /** Legacy Sortly field — kept for old rows */
   destination_folder_name: string | null
+  /** Phase 4+: inventory location id */
+  destination_location_id: number | null
   notes: string | null
   created_at: string
 }
@@ -65,6 +81,20 @@ export interface ParsedPackingItem {
   confidence: ParseConfidence
 }
 
+/** Represents a PO line item suggestion shown during item matching */
+export interface POLineSuggestion {
+  po_line_item_id: number
+  description: string
+  part_number: string | null
+  quantity_ordered: number
+  /** Already received across all prior receipts */
+  quantity_already_received: number
+  /** remaining = ordered − already_received */
+  quantity_remaining: number
+  received_status: 'pending' | 'partial' | 'received' | 'over_received'
+  item_id: number | null
+}
+
 /** Line item in the receiving form (transient UI state) */
 export interface ReceivingLineItem {
   /** Temp ID for React key */
@@ -73,28 +103,30 @@ export interface ReceivingLineItem {
   part_number: string | null
   /** Qty from the PO / order */
   quantity_ordered: number
-  /** Qty actually shipped (this becomes quantity_received for Sortly) */
+  /** Qty actually shipped */
   quantity_shipped: number
   /** Qty on back order */
   back_order: number
-  /** Alias — qty to add to inventory (defaults to quantity_shipped) */
+  /** Qty to add to inventory (defaults to quantity_shipped) */
   quantity_received: number
   confidence: ParseConfidence
   /** Resolved action */
   action: ItemAction
-  /** Linked Sortly item (null if creating new) */
-  sortly_item_id: number | null
-  /** Display name of the linked Sortly item */
-  sortly_item_name: string | null
-  /** Current quantity of the linked Sortly item */
-  sortly_current_quantity: number | null
-  /** Folder where item will be placed */
-  destination_folder_id: number | null
-  /** Folder name for display */
-  destination_folder_name: string | null
+  /** Phase 4+: Linked inventory item id */
+  item_id: number | null
+  /** Phase 4+: Linked inventory item name (for display) */
+  item_name_linked: string | null
+  /** Phase 4+: Current stock quantity at destination (for display) */
+  current_stock_quantity: number | null
+  /** Phase 4+: Linked PO line item id */
+  po_line_item_id: number | null
+  /** Phase 4+: PO line suggestion (for display/validation) */
+  po_line_suggestion: POLineSuggestion | null
+  /** Phase 4+: destination location id */
+  destination_location_id: number | null
+  /** Phase 4+: destination location name (for display) */
+  destination_location_name: string | null
   notes: string | null
-  /** Tags to apply to the Sortly item */
-  tags: string[]
 }
 
 /** A receiving_logs row (daily container) */
@@ -114,15 +146,29 @@ export interface DailyReceivingLog {
   entries: ReceivingEntryWithItems[]
 }
 
-/** Input to the confirm receipt mutation */
+/** Input to the confirm receipt mutation (Phase 4) */
 export interface ConfirmReceiptParams {
   vendor: string
+  vendor_id: number | null
+  po_id: number | null
   po_number: string | null
   date_received: string
   destination_type: DestinationType
-  destination_folder_id: number
+  destination_location_id: number | null
   project_name: string | null
   project_id: number | null
   notes: string | null
   items: ReceivingLineItem[]
+}
+
+/** Single item payload for the confirm_receipt RPC */
+export interface ConfirmReceiptItemPayload {
+  po_line_item_id: number | null
+  item_id: number | null
+  new_item: { name: string; part_number: string | null } | null
+  item_name: string
+  part_number: string | null
+  quantity_received: number
+  destination_location_id: number
+  notes: string | null
 }

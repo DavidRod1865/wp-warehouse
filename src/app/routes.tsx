@@ -9,6 +9,7 @@
  *     /deliveries/new     — Create delivery
  *     /deliveries/:id     — Edit delivery
  *     /inventory          — Inventory browser
+ *     /locations          — Location management (Warehouse, Trucks, Job Sites)
  *     /batches            — Batch management
  *     /packing-lists      — Packing list viewer
  *     /receiving          — Receiving log
@@ -31,12 +32,26 @@ import { ComingSoon } from '../components/shared/ComingSoon'
 
 const LoginPage = lazy(() => import('../features/auth/components/LoginPage'))
 const DriverLoginPage = lazy(() => import('../features/auth/components/DriverLoginPage'))
+
+// Driver PWA pages
+const DriverDeliveriesPage = lazy(() => import('../features/driver/components/DriverDeliveriesPage'))
+const DriverDeliveryDetailPage = lazy(() => import('../features/driver/components/DriverDeliveryDetailPage'))
+const DriverSettingsPage = lazy(() => import('../features/driver/components/DriverSettingsPage'))
 const DashboardPage = lazy(() => import('../features/deliveries/components/DashboardPage'))
 const CreateDeliveryPage = lazy(() => import('../features/deliveries/components/CreateDeliveryPage'))
 const EditDeliveryPage = lazy(() => import('../features/deliveries/components/EditDeliveryPage'))
 const DeliveriesPage = lazy(() => import('../features/deliveries/components/DeliveriesPage'))
 const InventoryPage = lazy(() => import('../features/inventory/components/InventoryPage'))
+const LocationsPage = lazy(() => import('../features/inventory/components/LocationsPage'))
 const ReceivingPage = lazy(() => import('../features/receiving/components/ReceivingPage'))
+const ClientsPage = lazy(() => import('../features/clients/components/ClientsPage'))
+const ClientDetailPage = lazy(() => import('../features/clients/components/ClientDetailPage'))
+const VendorsPage = lazy(() => import('../features/vendors/components/VendorsPage'))
+const VendorDetailPage = lazy(() => import('../features/vendors/components/VendorDetailPage'))
+const ProjectsPage = lazy(() => import('../features/projects/components/ProjectsPage'))
+const PurchaseOrdersPage = lazy(() => import('../features/purchase-orders/components/PurchaseOrdersPage'))
+const PoDetailPage = lazy(() => import('../features/purchase-orders/components/PoDetailPage'))
+const AuditPage = lazy(() => import('../features/audit/components/AuditPage'))
 
 export const router = createBrowserRouter([
   // Public routes
@@ -55,12 +70,21 @@ export const router = createBrowserRouter([
           { path: '/deliveries/new', element: <CreateDeliveryPage /> },
           { path: '/deliveries/:id', element: <EditDeliveryPage /> },
           { path: '/inventory', element: <InventoryPage /> },
+          { path: '/locations', element: <LocationsPage /> },
+          { path: '/clients', element: <ClientsPage /> },
+          { path: '/clients/:id', element: <ClientDetailPage /> },
+          { path: '/vendors', element: <VendorsPage /> },
+          { path: '/vendors/:id', element: <VendorDetailPage /> },
+          { path: '/projects', element: <ProjectsPage /> },
+          { path: '/purchase-orders', element: <PurchaseOrdersPage /> },
+          { path: '/purchase-orders/:id', element: <PoDetailPage /> },
           { path: '/batches', element: <ComingSoon /> },
           { path: '/packing-lists', element: <ComingSoon /> },
           { path: '/receiving', element: <ReceivingPage /> },
           { path: '/analytics', element: <ComingSoon /> },
           { path: '/users', element: <ComingSoon /> },
           { path: '/activity', element: <ComingSoon /> },
+          { path: '/audit', element: <AuditPage /> },
         ],
       },
     ],
@@ -73,9 +97,9 @@ export const router = createBrowserRouter([
       {
         element: <DriverLayout />,
         children: [
-          { path: '/driver/deliveries', element: <ComingSoon /> },
-          { path: '/driver/deliveries/:id', element: <ComingSoon /> },
-          { path: '/driver/settings', element: <ComingSoon /> },
+          { path: '/driver/deliveries', element: <DriverDeliveriesPage /> },
+          { path: '/driver/deliveries/:id', element: <DriverDeliveryDetailPage /> },
+          { path: '/driver/settings', element: <DriverSettingsPage /> },
         ],
       },
     ],

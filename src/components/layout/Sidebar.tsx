@@ -1,14 +1,13 @@
 /**
  * Sidebar — Manager navigation matching the hi-fi design.
  *
- * Brand mark, grouped nav sections, Sortly sync status, user avatar.
+ * Brand mark, grouped nav sections, user avatar.
  * Collapses to hamburger on mobile.
  */
 import { NavLink } from 'react-router-dom'
 import { useState } from 'react'
 import { useAuth } from '../../features/auth/hooks/useAuth'
 import { Icon } from '../ui/Icon'
-import { SortlyStatusPill } from './SortlyStatusPill'
 import type { IconName } from '../ui/Icon'
 import warehouseIcon from '../../assets/warehouse-icon.png'
 
@@ -22,8 +21,16 @@ interface NavItem {
 const operationsNav: NavItem[] = [
   { to: '/', label: 'Dashboard', icon: 'home', end: true },
   { to: '/receiving', label: 'Receiving', icon: 'clipboard' },
+  { to: '/purchase-orders', label: 'Purchase Orders', icon: 'file' },
   { to: '/inventory', label: 'Inventory', icon: 'box' },
+  { to: '/locations', label: 'Locations', icon: 'box' },
   { to: '/deliveries', label: 'Deliveries', icon: 'truck' },
+]
+
+const directoryNav: NavItem[] = [
+  { to: '/projects', label: 'Projects', icon: 'briefcase' },
+  { to: '/clients', label: 'Clients', icon: 'building' },
+  { to: '/vendors', label: 'Vendors', icon: 'shopping-cart' },
 ]
 
 const fieldNav: NavItem[] = [
@@ -33,6 +40,7 @@ const fieldNav: NavItem[] = [
 const dataNav: NavItem[] = [
   { to: '/analytics', label: 'Reports', icon: 'chart' },
   { to: '/activity', label: 'Activity', icon: 'settings' },
+  { to: '/audit', label: 'Audit', icon: 'clipboard' },
 ]
 
 function NavSection({ title, items, onClose }: { title: string; items: NavItem[]; onClose: () => void }) {
@@ -134,15 +142,13 @@ export function Sidebar() {
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto px-2.5 flex flex-col gap-px">
           <NavSection title="Operations" items={operationsNav} onClose={close} />
+          <NavSection title="Directory" items={directoryNav} onClose={close} />
           <NavSection title="Field" items={fieldNav} onClose={close} />
           <NavSection title="Data" items={dataNav} onClose={close} />
         </nav>
 
         {/* Footer */}
         <div className="mt-auto px-4 pb-3.5 pt-3.5 border-t border-[var(--line)]">
-          {/* Sortly sync */}
-          <SortlyStatusPill showDetail />
-
           {/* User */}
           <div className="flex items-center gap-2.5 mt-2.5 px-1 py-1.5">
             <div className="w-[30px] h-[30px] rounded-full bg-gradient-to-br from-[#4a5578] to-[#1a2338] text-white grid place-items-center font-semibold text-xs shrink-0">

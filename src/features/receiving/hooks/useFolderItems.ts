@@ -1,19 +1,17 @@
 /**
- * useFolderItems — Fetch items in a Sortly folder for auto-matching
+ * useFolderItems (Phase 4 — inventory-backed)
  *
- * Used during receiving to match parsed packing list items against existing
- * Sortly inventory. Returns items + a fuzzy matcher.
+ * Replaces the Sortly-backed version. Now fetches items from the `items` table
+ * (optionally stock-at-location filtered) and provides the same fuzzy-match
+ * interface the ReceiptLineItems component expects.
  *
- * recursive=false (project mode): items in the given folder only
- * recursive=true  (warehouse mode): items in the folder AND all direct subfolders
+ * The `folderId` parameter is intentionally ignored (Sortly concept); the hook
+ * returns ALL inventory items and lets the caller match by name/part_number.
+ * This keeps the call-site API stable so ReceiptLineItems needs minimal changes.
  */
 import { useMemo } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { useItems } from '../../inventory/hooks/useItems'
-import { fetchAllItemsInFolder } from '../../inventory/hooks/useItems'
-import { fetchSubfolders } from '../../inventory/hooks/useFolders'
-import { sortlyKeys } from '../../inventory/hooks/sortlyKeys'
-import type { SortlyItem } from '../../../types/sortly'
+import { useInventoryItems } from '../../inventory/hooks/useInventoryItems'
+import type { InventoryItem } from '../../inventory/types'
 
 // ── Fuzzy matching helpers ────────────────────────────────────────────────────
 
@@ -21,11 +19,11 @@ function normalize(s: string): string {
   return s.toLowerCase().trim().replace(/\s+/g, ' ')
 }
 
-function matchScore(query: string, target: string): number {
+function matchScore(query: string, target: string, partNumber?: string | null): number {
   const q = normalize(query)
   const t = normalize(target)
 
-  if (q === t) return 1
+  if (q === t) return 1.0
 
   const queryWords = q.split(' ')
   if (queryWords.every((w) => t.includes(w))) return 0.8
@@ -35,66 +33,44 @@ function matchScore(query: string, target: string): number {
     return (matchedWords.length / queryWords.length) * 0.6
   }
 
+  // Try matching against part_number too
+  if (partNumber) {
+    const pn = normalize(partNumber)
+    if (pn === q) return 0.75
+    if (q.includes(pn) || pn.includes(q)) return 0.5
+  }
+
   return 0
 }
 
 export interface ItemMatch {
-  item: SortlyItem
+  item: InventoryItem
   score: number
-}
-
-// ── Recursive fetch ───────────────────────────────────────────────────────────
-
-async function fetchAllItemsRecursive(rootFolderId: number): Promise<SortlyItem[]> {
-  // 1. Get direct subfolders of root
-  const subfolders = await fetchSubfolders(rootFolderId)
-
-  // 2. All folder IDs: root itself + all subfolders
-  const folderIds = [rootFolderId, ...subfolders.map((f) => f.id)]
-
-  // 3. Fetch items from all folders in parallel
-  const results = await Promise.all(folderIds.map((id) => fetchAllItemsInFolder(id)))
-
-  // 4. Flatten and deduplicate by item id
-  const seen = new Set<number>()
-  return results.flat().filter((item) => {
-    if (seen.has(item.id)) return false
-    seen.add(item.id)
-    return true
-  })
 }
 
 // ── Hook ─────────────────────────────────────────────────────────────────────
 
-export function useFolderItems(folderId: number | null | undefined, recursive = false) {
-  // Non-recursive: delegate to the standard useItems hook (cached per folder)
-  const flatQuery = useItems(recursive ? null : folderId)
-
-  // Recursive: custom query that fetches subfolders then all items
-  const recursiveQuery = useQuery({
-    queryKey: sortlyKeys.itemListRecursive(folderId!),
-    queryFn: () => fetchAllItemsRecursive(folderId!),
-    enabled: recursive && !!folderId,
-    staleTime: 2 * 60 * 1000,
-  })
-
-  const activeQuery = recursive ? recursiveQuery : flatQuery
-  const rawItems = activeQuery.data ?? ([] as SortlyItem[])
-  const items = useMemo(() => rawItems.filter((i) => i.type !== 'folder'), [rawItems])
+/**
+ * @param _folderId   Unused (legacy Sortly parameter — kept for API compat)
+ * @param _recursive  Unused (legacy parameter — kept for API compat)
+ */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function useFolderItems(_folderId?: number | null, _recursive = false) {
+  const { data: allItems = [], isLoading, error } = useInventoryItems()
 
   const findMatches = useMemo(() => {
     return (itemName: string, threshold = 0.5): ItemMatch[] => {
-      return items
-        .map((item) => ({ item, score: matchScore(itemName, item.name) }))
+      return allItems
+        .map((item) => ({ item, score: matchScore(itemName, item.name, item.part_number) }))
         .filter((r) => r.score >= threshold)
         .sort((a, b) => b.score - a.score)
     }
-  }, [items])
+  }, [allItems])
 
   return {
-    items,
-    isLoading: activeQuery.isLoading,
-    error: activeQuery.error,
+    items: allItems,
+    isLoading,
+    error,
     findMatches,
   }
 }

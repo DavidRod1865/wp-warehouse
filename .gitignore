@@ -29,7 +29,9 @@ dev-dist
 *.sln
 *.sw?
 
+# Ignore ad-hoc SQL dumps, but database migrations belong in version control
 *.sql
+!supabase/migrations/*.sql
 CLAUDE.md
 
 # Claude Code & Playwright MCP artifacts

@@ -1,33 +1,28 @@
 /**
- * DailyReceivingLog — Section that audits all receiving activity for a single day
+ * DailyReceivingLog (Phase 4) — Audit log for a single day's receiving activity
  *
- * Lives on the /receiving page below the new-receipt workflow. Defaults to today;
- * users can navigate to other days via prev/next arrows or a date picker.
+ * Shows location names (not Sortly folder names) for Phase 4+ rows.
+ * Gracefully falls back to legacy destination_folder_name for old rows.
+ * PDF export updated to use location names.
  *
- * Reflects React Query cache invalidation — when a new receipt is confirmed,
- * useConfirmReceipt invalidates receivingKeys.all, which propagates here.
+ * No Sortly imports.
  */
 import { useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useDailyReceivingLog, useDatesWithEntries } from '../hooks/useDailyReceivingLog'
-import { useFolders } from '../../inventory/hooks/useFolders'
+import { useLocations } from '../../inventory/hooks/useLocations'
 import { Icon } from '../../../components/ui/Icon'
 import { generateReceivingLogPDF } from '../utils/generateReceivingLogPDF'
 import { ACTION_STYLES } from '../utils/actionStyles'
 import type { ReceivingEntryWithItems, ReceivingItem } from '../types'
 
-/** Format an ISO date as a long-form display string */
 function formatLongDate(iso: string): string {
   const d = new Date(iso + 'T00:00:00')
   return d.toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
+    weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
   })
 }
 
-/** Add (or subtract) days from an ISO date string */
 function shiftDate(iso: string, days: number): string {
   const d = new Date(iso + 'T00:00:00')
   d.setDate(d.getDate() + days)
@@ -42,12 +37,18 @@ export function DailyReceivingLog() {
   const { data: log, isLoading } = useDailyReceivingLog(date)
   const { data: datesWithEntries = [] } = useDatesWithEntries()
 
+  // Load all locations so we can look up location names for Phase 4+ rows
+  const { data: allLocations = [] } = useLocations()
+  const locationNameMap = useMemo(
+    () => new Map(allLocations.map((l) => [l.id, l.name])),
+    [allLocations]
+  )
+
   const entries = useMemo<ReceivingEntryWithItems[]>(
     () => log?.entries ?? [],
     [log]
   )
 
-  // ── Summary stats (formula: units = sum of quantity_received excluding skipped) ──
   const stats = useMemo(() => {
     let unitsReceived = 0
     let lineItemsActive = 0
@@ -68,7 +69,11 @@ export function DailyReceivingLog() {
         unitsReceived += item.quantity_received
         if (item.action === 'update') updated += 1
         if (item.action === 'create') created += 1
-        if (item.destination_folder_name) destinations.add(item.destination_folder_name)
+        // Phase 4+: use location name; legacy: use destination_folder_name
+        const dest = item.destination_location_id
+          ? locationNameMap.get(item.destination_location_id)
+          : item.destination_folder_name
+        if (dest) destinations.add(dest)
       }
     }
 
@@ -82,17 +87,16 @@ export function DailyReceivingLog() {
       destinationCount: destinations.size,
       entryCount: entries.length,
     }
-  }, [entries])
+  }, [entries, locationNameMap])
 
   const handlePrint = () => {
-    if (log) generateReceivingLogPDF(log)
+    if (log) generateReceivingLogPDF(log, locationNameMap)
   }
 
   const isToday = date === TODAY()
 
   return (
     <div className="space-y-4">
-      {/* Section header with date + navigator + PDF button */}
       <div className="flex items-end justify-between gap-4 flex-wrap">
         <div>
           <div
@@ -115,11 +119,7 @@ export function DailyReceivingLog() {
         </div>
 
         <div className="flex items-center gap-2">
-          <DateNavigator
-            date={date}
-            datesWithEntries={datesWithEntries}
-            onChange={setDate}
-          />
+          <DateNavigator date={date} datesWithEntries={datesWithEntries} onChange={setDate} />
           <button
             onClick={handlePrint}
             disabled={stats.entryCount === 0}
@@ -132,16 +132,10 @@ export function DailyReceivingLog() {
         </div>
       </div>
 
-      {/* Entries card with stats strip baked into the header */}
       <div className="rounded-xl border border-[var(--line)] bg-[var(--panel)] overflow-hidden">
-        {/* Stats strip (D1: fused into the entries card header) */}
         <div className="px-5 py-4 border-b border-[var(--line)]" style={{ background: 'var(--panel-2)' }}>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Stat
-              label="Units received"
-              value={isLoading ? '—' : stats.unitsReceived.toLocaleString()}
-              accent
-            />
+            <Stat label="Units received" value={isLoading ? '—' : stats.unitsReceived.toLocaleString()} accent />
             <Stat
               label="Line items"
               value={isLoading ? '—' : stats.lineItemsActive.toLocaleString()}
@@ -160,19 +154,12 @@ export function DailyReceivingLog() {
           </div>
         </div>
 
-        {/* Section title (E: sans-medium for sub-section, D2: subtext removed) */}
         <div className="px-5 py-3 border-b border-[var(--line)] flex items-center justify-between">
-          <div
-            className="font-medium text-[var(--ink)]"
-            style={{ fontSize: 13, letterSpacing: '-0.1px' }}
-          >
+          <div className="font-medium text-[var(--ink)]" style={{ fontSize: 13, letterSpacing: '-0.1px' }}>
             Entries
           </div>
           {stats.entryCount > 0 && (
-            <span
-              className="text-[var(--muted)]"
-              style={{ fontFamily: 'var(--mono)', fontSize: 11 }}
-            >
+            <span className="text-[var(--muted)]" style={{ fontFamily: 'var(--mono)', fontSize: 11 }}>
               {stats.entryCount} total
             </span>
           )}
@@ -185,14 +172,14 @@ export function DailyReceivingLog() {
         ) : entries.length === 0 ? (
           <EmptyState />
         ) : (
-          <EntriesTable entries={entries} />
+          <EntriesTable entries={entries} locationNameMap={locationNameMap} />
         )}
       </div>
     </div>
   )
 }
 
-// ── Date navigator ─────────────────────────────────────
+// ── Date navigator ──────────────────────────────────────────────────────────────
 
 function DateNavigator({
   date,
@@ -237,20 +224,12 @@ function DateNavigator({
   )
 }
 
-// ── Stat (E: consistent treatment, no mono/serif mixing) ──
+// ── Stat ──────────────────────────────────────────────────────────────────────
 
 function Stat({
-  label,
-  value,
-  subtext,
-  accent,
-  small,
+  label, value, subtext, accent, small,
 }: {
-  label: string
-  value: string
-  subtext?: string
-  accent?: boolean
-  small?: boolean
+  label: string; value: string; subtext?: string; accent?: boolean; small?: boolean
 }) {
   return (
     <div>
@@ -282,9 +261,15 @@ function Stat({
   )
 }
 
-// ── Entries table ──────────────────────────────────────
+// ── Entries table ──────────────────────────────────────────────────────────────
 
-function EntriesTable({ entries }: { entries: ReceivingEntryWithItems[] }) {
+function EntriesTable({
+  entries,
+  locationNameMap,
+}: {
+  entries: ReceivingEntryWithItems[]
+  locationNameMap: Map<number, string>
+}) {
   const [expanded, setExpanded] = useState<Set<number>>(new Set())
 
   const toggle = (id: number) => {
@@ -302,12 +287,7 @@ function EntriesTable({ entries }: { entries: ReceivingEntryWithItems[] }) {
         <thead>
           <tr
             className="border-b border-[var(--line)] text-[var(--muted)]"
-            style={{
-              fontFamily: 'var(--mono)',
-              fontSize: 10.5,
-              letterSpacing: '.06em',
-              textTransform: 'uppercase',
-            }}
+            style={{ fontFamily: 'var(--mono)', fontSize: 10.5, letterSpacing: '.06em', textTransform: 'uppercase' }}
           >
             <th className="text-left font-medium px-5 py-2.5" style={{ width: 90 }}>Time</th>
             <th className="text-left font-medium px-3 py-2.5">Vendor</th>
@@ -323,6 +303,7 @@ function EntriesTable({ entries }: { entries: ReceivingEntryWithItems[] }) {
             <EntryRow
               key={entry.id}
               entry={entry}
+              locationNameMap={locationNameMap}
               isExpanded={expanded.has(entry.id)}
               onToggle={() => toggle(entry.id)}
             />
@@ -335,22 +316,25 @@ function EntriesTable({ entries }: { entries: ReceivingEntryWithItems[] }) {
 
 function EntryRow({
   entry,
+  locationNameMap,
   isExpanded,
   onToggle,
 }: {
   entry: ReceivingEntryWithItems
+  locationNameMap: Map<number, string>
   isExpanded: boolean
   onToggle: () => void
 }) {
   const time = new Date(entry.created_at).toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
+    hour: 'numeric', minute: '2-digit', hour12: true,
   })
 
   const activeItems = entry.items.filter((i) => i.action !== 'skip')
   const units = activeItems.reduce((sum, i) => sum + i.quantity_received, 0)
+
+  // Phase 4+: show location name; legacy: fall back to project_name / destination_type
   const destination =
+    (entry.destination_location_id ? locationNameMap.get(entry.destination_location_id) : null) ??
     entry.project_name ??
     (entry.destination_type === 'warehouse' ? 'Main Warehouse' : '—')
 
@@ -360,32 +344,20 @@ function EntryRow({
         className="border-b border-[var(--line)] last:border-0 hover:bg-[var(--panel-2)] transition-colors cursor-pointer"
         onClick={onToggle}
       >
-        <td
-          className="px-5 py-3 text-[var(--muted)]"
-          style={{ fontFamily: 'var(--mono)', fontSize: 12 }}
-        >
+        <td className="px-5 py-3 text-[var(--muted)]" style={{ fontFamily: 'var(--mono)', fontSize: 12 }}>
           {time}
         </td>
         <td className="px-3 py-3">
           <div className="font-medium text-[var(--ink)]">{entry.vendor}</div>
         </td>
-        <td
-          className="px-3 py-3"
-          style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--ink-2)' }}
-        >
+        <td className="px-3 py-3" style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--ink-2)' }}>
           {entry.po_number || '—'}
         </td>
         <td className="px-3 py-3 text-[var(--ink-2)] text-sm">{destination}</td>
-        <td
-          className="px-3 py-3 text-right"
-          style={{ fontFamily: 'var(--mono)', fontSize: 13 }}
-        >
+        <td className="px-3 py-3 text-right" style={{ fontFamily: 'var(--mono)', fontSize: 13 }}>
           {activeItems.length}
         </td>
-        <td
-          className="px-3 py-3 text-right font-medium"
-          style={{ fontFamily: 'var(--mono)', fontSize: 13, color: 'var(--signal)' }}
-        >
+        <td className="px-3 py-3 text-right font-medium" style={{ fontFamily: 'var(--mono)', fontSize: 13, color: 'var(--signal)' }}>
           {units}
         </td>
         <td className="px-5 py-3 text-right text-[var(--muted)]">
@@ -413,7 +385,7 @@ function EntryRow({
                 transition={{ duration: 0.18, ease: [0.4, 0, 0.2, 1] }}
                 style={{ overflow: 'hidden' }}
               >
-                <ExpandedItems entry={entry} />
+                <ExpandedItems entry={entry} locationNameMap={locationNameMap} />
               </motion.div>
             </td>
           </motion.tr>
@@ -423,13 +395,13 @@ function EntryRow({
   )
 }
 
-function ExpandedItems({ entry }: { entry: ReceivingEntryWithItems }) {
-  const { data: allFolders } = useFolders()
-  const folderNameMap = useMemo(
-    () => new Map((allFolders ?? []).map((f) => [f.id, f.name])),
-    [allFolders]
-  )
-
+function ExpandedItems({
+  entry,
+  locationNameMap,
+}: {
+  entry: ReceivingEntryWithItems
+  locationNameMap: Map<number, string>
+}) {
   if (entry.items.length === 0) {
     return (
       <div className="py-3 text-sm text-[var(--muted)]">
@@ -444,25 +416,18 @@ function ExpandedItems({ entry }: { entry: ReceivingEntryWithItems }) {
         <thead>
           <tr
             className="text-[var(--muted)]"
-            style={{
-              fontFamily: 'var(--mono)',
-              fontSize: 10,
-              letterSpacing: '.06em',
-              textTransform: 'uppercase',
-            }}
+            style={{ fontFamily: 'var(--mono)', fontSize: 10, letterSpacing: '.06em', textTransform: 'uppercase' }}
           >
             <th className="text-left font-medium py-1.5 pr-3">Item</th>
             <th className="text-left font-medium py-1.5 px-2">Part #</th>
             <th className="text-left font-medium py-1.5 px-2">Destination</th>
             <th className="text-left font-medium py-1.5 px-2">Action</th>
-            <th className="text-right font-medium py-1.5 px-2">Before</th>
-            <th className="text-right font-medium py-1.5 px-2">Received</th>
-            <th className="text-right font-medium py-1.5 pl-2">After</th>
+            <th className="text-right font-medium py-1.5 pl-2">Received</th>
           </tr>
         </thead>
         <tbody>
           {entry.items.map((item) => (
-            <ItemRow key={item.id} item={item} folderNameMap={folderNameMap} />
+            <ItemRow key={item.id} item={item} locationNameMap={locationNameMap} />
           ))}
         </tbody>
       </table>
@@ -472,24 +437,23 @@ function ExpandedItems({ entry }: { entry: ReceivingEntryWithItems }) {
 
 function ItemRow({
   item,
-  folderNameMap,
+  locationNameMap,
 }: {
   item: ReceivingItem
-  folderNameMap: Map<number, string>
+  locationNameMap: Map<number, string>
 }) {
   const badge = ACTION_STYLES[item.action] ?? ACTION_STYLES.pending
+
+  // Phase 4+: prefer location name; legacy: fall back to destination_folder_name
   const destinationName =
-    item.destination_folder_name ||
-    (item.destination_folder_id ? folderNameMap.get(item.destination_folder_id) : null) ||
+    (item.destination_location_id ? locationNameMap.get(item.destination_location_id) : null) ??
+    item.destination_folder_name ??
     '—'
 
   return (
     <tr className="border-t border-[var(--line)]">
       <td className="py-2 pr-3 text-[var(--ink)] font-medium">{item.item_name}</td>
-      <td
-        className="py-2 px-2 text-[var(--muted)]"
-        style={{ fontFamily: 'var(--mono)' }}
-      >
+      <td className="py-2 px-2 text-[var(--muted)]" style={{ fontFamily: 'var(--mono)' }}>
         {item.part_number || '—'}
       </td>
       <td className="py-2 px-2 text-[var(--muted)] text-xs">{destinationName}</td>
@@ -501,48 +465,33 @@ function ItemRow({
           {badge.label}
         </span>
       </td>
-      <td className="py-2 px-2 text-right" style={{ fontFamily: 'var(--mono)' }}>
-        {item.sortly_quantity_before ?? '—'}
-      </td>
       <td
-        className="py-2 px-2 text-right font-medium"
+        className="py-2 pl-2 text-right font-medium"
         style={{ fontFamily: 'var(--mono)', color: 'var(--signal)' }}
       >
         +{item.quantity_received}
-      </td>
-      <td
-        className="py-2 pl-2 text-right font-medium"
-        style={{ fontFamily: 'var(--mono)' }}
-      >
-        {item.sortly_quantity_after ?? '—'}
       </td>
     </tr>
   )
 }
 
-// ── Empty state (F: ghost rows that show what a populated day looks like) ──
+// ── Empty state ────────────────────────────────────────────────────────────────
 
 function EmptyState() {
   return (
     <div className="px-5 py-10">
       <div className="text-center mb-6">
-        <p className="text-base font-medium text-[var(--ink-2)]">
-          No receipts logged for this day
-        </p>
+        <p className="text-base font-medium text-[var(--ink-2)]">No receipts logged for this day</p>
         <p className="text-sm mt-1 text-[var(--muted)]">
           Use the navigator above to find a day with activity, or log a new receipt at the top of the page.
         </p>
       </div>
-      {/* Faint ghost rows hint at what populated state looks like */}
       <div className="mx-auto max-w-[640px] space-y-2" style={{ opacity: 0.35 }}>
         {[0, 1, 2].map((i) => (
           <div
             key={i}
             className="flex items-center gap-3 px-4 py-3 rounded-lg"
-            style={{
-              border: '1px dashed var(--line-2)',
-              background: 'var(--panel)',
-            }}
+            style={{ border: '1px dashed var(--line-2)', background: 'var(--panel)' }}
           >
             <div className="w-12 h-3 rounded" style={{ background: 'var(--line)' }} />
             <div className="flex-1 h-3 rounded" style={{ background: 'var(--line)', maxWidth: 180 }} />

@@ -16,6 +16,8 @@ interface DeliveryFormProps {
   isEdit?: boolean
   isSaving?: boolean
   savingStatus?: string
+  /** In edit mode: show delivery number for reference */
+  deliveryNumber?: string
 }
 
 export function DeliveryForm({
@@ -24,6 +26,7 @@ export function DeliveryForm({
   isEdit = false,
   isSaving = false,
   savingStatus = '',
+  deliveryNumber,
 }: DeliveryFormProps) {
   const [showItemSelector, setShowItemSelector] = useState(false)
 
@@ -39,16 +42,17 @@ export function DeliveryForm({
     defaultValues: {
       delivery_number: '',
       po_reference: '',
-      project_id: null,
-      truck_folder_id: null,
+      project_id: undefined,
+      truck_location_id: null,
       from_location_id: null,
       from_address: DEFAULT_FROM_ADDRESS,
       to_address: EMPTY_ADDRESS,
       items: [],
       driver_id: null,
       status: 'pending',
+      delivery_type: 'commercial',
       ...defaultValues,
-    },
+    } as DeliveryFormValues,
   })
 
   const { fields, append, remove } = useFieldArray({ control, name: 'items' })
@@ -56,21 +60,9 @@ export function DeliveryForm({
   const watchProjectId = watch('project_id')
   const watchFromLocationId = watch('from_location_id')
 
-  const { projects, trucks, mainWarehouseFolderId } = useDeliveryFormData()
+  const { projects, trucks, warehouseLocations } = useDeliveryFormData()
 
-  useEffect(() => {
-    if (watchProjectId) {
-      const project = projects.find((p) => p.id === watchProjectId)
-      if (project?.sortly_warehouse_folder_id) {
-        setValue('from_location_id', project.sortly_warehouse_folder_id)
-      } else if (mainWarehouseFolderId) {
-        setValue('from_location_id', mainWarehouseFolderId)
-      }
-    } else if (mainWarehouseFolderId) {
-      setValue('from_location_id', mainWarehouseFolderId)
-    }
-  }, [watchProjectId, projects, mainWarehouseFolderId, setValue])
-
+  // Auto-fill to_address from project
   useEffect(() => {
     if (watchProjectId && !isEdit) {
       const project = projects.find((p) => p.id === watchProjectId)
@@ -92,7 +84,7 @@ export function DeliveryForm({
   }
 
   const existingItemIds = new Set(
-    fields.map((f) => f.sortly_item_id).filter((id): id is number => id !== null)
+    fields.map((f) => f.item_id).filter((id): id is number => id !== null && id !== undefined)
   )
 
   return (
@@ -117,6 +109,8 @@ export function DeliveryForm({
         errors={errors}
         projects={projects}
         trucks={trucks}
+        warehouseLocations={warehouseLocations}
+        deliveryNumber={deliveryNumber}
       />
 
       <div className="rounded-xl border border-[var(--line)] bg-[var(--panel)] p-5">
@@ -128,7 +122,14 @@ export function DeliveryForm({
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <AddressFields prefix="from_address" label="From" register={register} errors={errors} />
-          <AddressFields prefix="to_address" label="To" register={register} errors={errors} />
+          <div>
+            <AddressFields prefix="to_address" label="To" register={register} errors={errors} />
+            {watchProjectId && projects.find((p) => p.id === watchProjectId)?.project_address && (
+              <p className="text-xs text-[var(--muted)] mt-1.5">
+                Auto-filled from project address
+              </p>
+            )}
+          </div>
         </div>
       </div>
 
@@ -168,8 +169,7 @@ export function DeliveryForm({
         isOpen={showItemSelector}
         onClose={() => setShowItemSelector(false)}
         onAddItems={handleAddItems}
-        sourceFolderId={watchFromLocationId}
-        mainWarehouseFolderId={mainWarehouseFolderId}
+        sourceLocationId={watchFromLocationId}
         existingItemIds={existingItemIds}
       />
     </form>

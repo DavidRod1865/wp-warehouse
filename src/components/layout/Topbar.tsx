@@ -4,7 +4,6 @@
 import { useLocation } from 'react-router-dom'
 import { Icon } from '../ui/Icon'
 import { useTheme } from '../../hooks/useTheme'
-import { SortlyStatusPill } from './SortlyStatusPill'
 
 const routeLabels: Record<string, string> = {
   '/': 'Dashboard',
@@ -54,9 +53,6 @@ export function Topbar() {
           ⌘K
         </kbd>
       </div>
-
-      {/* Sortly status */}
-      <SortlyStatusPill />
 
       {/* Theme toggle */}
       <button

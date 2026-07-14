@@ -1,69 +1,59 @@
 /**
- * useReceivingMutations — Core mutation for confirming receipts
+ * useReceivingMutations — Core mutation for confirming receipts (Phase 4)
  *
- * Handles the full confirm flow:
- * 1. Update Sortly quantities for matched items
- * 2. Create new Sortly items for unmatched items
- * 3. Save receipt header + line items to Supabase
- * 4. Invalidate caches
+ * Flow:
+ * 1. Create / fetch today's receiving_log (Supabase insert, fine as-is).
+ * 2. Insert a receiving_log_entry row (draft; status = 'draft').
+ * 3. Build the p_items array and call confirm_receipt RPC, which atomically:
+ *    - Creates missing items in `items`.
+ *    - Upserts stock at the destination location.
+ *    - Appends inventory_movements ledger rows.
+ *    - Inserts receiving_items rows.
+ *    - Accumulates PO line quantity_received + recomputes received_status + PO status.
+ *    - Sets the entry status to 'confirmed'.
+ * 4. Invalidate: receivingKeys, poKeys, inventoryKeys (stock, items, movements).
+ *
+ * Nothing in this file imports Sortly code.
  */
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../../lib/supabase'
-import { sortlyClient } from '../../../lib/sortly'
 import { receivingKeys } from './receivingKeys'
-import { sortlyKeys } from '../../inventory/hooks/sortlyKeys'
-import type { ConfirmReceiptParams, ReceivingLineItem } from '../types'
-
-type CustomAttr = {
-  custom_attribute_id: number
-  custom_attribute_name: string
-  value: string
-}
-
-/** Fetch custom field definitions from Sortly (cached per call) */
-let cachedFieldMap: Map<string, number> | null = null
-
-async function getCustomFieldMap(): Promise<Map<string, number>> {
-  if (cachedFieldMap) return cachedFieldMap
-
-  const result = await sortlyClient.listCustomFields()
-  const map = new Map<string, number>()
-  for (const field of result.data) {
-    map.set(field.name.toLowerCase(), field.id)
-  }
-  cachedFieldMap = map
-  return map
-}
-
-function buildCustomAttributes(
-  fieldMap: Map<string, number>,
-  vendor: string | null,
-  partNumber: string | null,
-  poNumber: string | null,
-): CustomAttr[] {
-  const attrs: CustomAttr[] = []
-
-  if (vendor) {
-    const id = fieldMap.get('brand')
-    if (id) attrs.push({ custom_attribute_id: id, custom_attribute_name: 'Brand', value: vendor })
-  }
-  if (partNumber) {
-    const id = fieldMap.get('part number')
-    if (id) attrs.push({ custom_attribute_id: id, custom_attribute_name: 'Part Number', value: partNumber })
-  }
-  if (poNumber) {
-    const id = fieldMap.get('po number')
-    if (id) attrs.push({ custom_attribute_id: id, custom_attribute_name: 'PO Number', value: poNumber })
-  }
-
-  return attrs
-}
+import { poKeys } from '../../purchase-orders/hooks/poKeys'
+import { inventoryKeys } from '../../inventory/hooks/inventoryKeys'
+import type {
+  ConfirmReceiptParams,
+  ConfirmReceiptItemPayload,
+  ReceivingLineItem,
+} from '../types'
 
 interface ConfirmResult {
   entryId: number
-  itemsUpdated: number
-  itemsCreated: number
-  itemsSkipped: number
+  itemsProcessed: number
+  poId: number | null
+  poStatus: string | null
+}
+
+/** Build the RPC payload item from a UI line item */
+function buildItemPayload(
+  item: ReceivingLineItem,
+  defaultLocationId: number,
+): ConfirmReceiptItemPayload {
+  const locationId = item.destination_location_id ?? defaultLocationId
+
+  return {
+    po_line_item_id: item.po_line_item_id ?? null,
+    item_id: item.item_id ?? null,
+    // If item_id is null, pass new_item so the RPC can create it
+    new_item:
+      item.item_id == null
+        ? { name: item.item_name, part_number: item.part_number ?? null }
+        : null,
+    item_name: item.item_name,
+    part_number: item.part_number ?? null,
+    quantity_received: item.quantity_received,
+    destination_location_id: locationId,
+    notes: item.notes ?? null,
+  }
 }
 
 export function useConfirmReceipt(onProgress?: (message: string) => void) {
@@ -73,99 +63,43 @@ export function useConfirmReceipt(onProgress?: (message: string) => void) {
     mutationFn: async (params) => {
       const {
         vendor,
+        vendor_id,
+        po_id,
         po_number,
         date_received,
         destination_type,
-        destination_folder_id,
+        destination_location_id,
         project_name,
         project_id,
         notes,
         items,
       } = params
 
-      let itemsUpdated = 0
-      let itemsCreated = 0
-      let itemsSkipped = 0
+      // Only process items that are not skipped and have an action
+      const activeItems = items.filter((i) => i.action !== 'skip' && i.action !== 'pending')
 
-      // Pre-fetch custom fields for creating new items
-      const fieldMap = await getCustomFieldMap()
-
-      // Track results per item for Supabase insert
-      const processedItems: Array<ReceivingLineItem & {
-        sortly_quantity_before: number | null
-        sortly_quantity_after: number | null
-        final_sortly_item_id: number | null
-      }> = []
-
-      // Step 1: Process Sortly operations sequentially
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i]
-        onProgress?.(`Processing item ${i + 1} of ${items.length}: ${item.item_name}`)
-
-        let qtyBefore: number | null = null
-        let qtyAfter: number | null = null
-        let finalSortlyId: number | null = item.sortly_item_id
-
-        const sortlyTags = item.tags.length > 0
-          ? item.tags.map((name) => ({ name }))
-          : undefined
-
-        if (item.action === 'update' && item.sortly_item_id) {
-          // Read current quantity and increment
-          const current = await sortlyClient.getItem(item.sortly_item_id)
-          qtyBefore = Math.round(current.data.quantity ?? 0)
-          qtyAfter = qtyBefore + item.quantity_received
-
-          await sortlyClient.updateItem(item.sortly_item_id, {
-            quantity: qtyAfter,
-            ...(sortlyTags ? { tags: sortlyTags } : {}),
-          })
-          itemsUpdated++
-        } else if (item.action === 'create') {
-          // Create new item in Sortly
-          const folderId = item.destination_folder_id || destination_folder_id
-          const attrs = buildCustomAttributes(fieldMap, vendor, item.part_number, po_number)
-
-          const result = await sortlyClient.createItem({
-            name: item.item_name,
-            type: 'item',
-            parent_id: folderId,
-            quantity: item.quantity_received,
-            custom_attribute_values: attrs,
-            ...(sortlyTags ? { tags: sortlyTags } : {}),
-          })
-
-          finalSortlyId = result.data.id
-          qtyBefore = 0
-          qtyAfter = item.quantity_received
-          itemsCreated++
-        } else {
-          itemsSkipped++
-        }
-
-        processedItems.push({
-          ...item,
-          sortly_quantity_before: qtyBefore,
-          sortly_quantity_after: qtyAfter,
-          final_sortly_item_id: finalSortlyId,
-        })
+      if (activeItems.length === 0) {
+        throw new Error('No items to receive — make sure each item is linked or set to "Create new".')
       }
 
-      // Step 2: Save to Supabase
-      onProgress?.('Saving receipt to database...')
+      if (destination_location_id == null) {
+        throw new Error('A destination location is required.')
+      }
 
+      onProgress?.('Saving receipt header...')
+
+      // Step 1: Get or create today's receiving_log
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Not authenticated')
 
       const today = new Date().toISOString().split('T')[0]
 
-      // Get or create today's receiving_log
       let { data: log } = await supabase
         .from('receiving_logs')
         .select('id')
         .eq('log_date', today)
         .eq('created_by', user.id)
-        .single()
+        .maybeSingle()
 
       if (!log) {
         const { data: newLog, error: logErr } = await supabase
@@ -177,35 +111,26 @@ export function useConfirmReceipt(onProgress?: (message: string) => void) {
         log = newLog
       }
 
-      // Compute unique destination names for receipt-level summary
-      const uniqueDestinations = [...new Set(
-        processedItems
-          .filter((i) => i.action !== 'skip')
-          .map((i) => i.destination_folder_name || project_name)
-          .filter(Boolean)
-      )]
-
-      // Insert receiving_log_entry
+      // Step 2: Insert receiving_log_entry as draft (RPC will confirm it)
       const { data: entry, error: entryErr } = await supabase
         .from('receiving_log_entries')
         .insert({
           receiving_log_id: log!.id,
           vendor,
-          po_number,
-          project_name,
-          project_id,
-          raw_content: notes,
-          status: 'confirmed',
+          vendor_id: vendor_id ?? null,
+          po_id: po_id ?? null,
+          po_number: po_number || null,
+          project_name: project_name ?? null,
+          project_id: project_id ?? null,
+          raw_content: notes ?? null,
+          status: 'draft',
           destination_type,
-          destination_folder_id,
+          destination_location_id,
           date_received,
           parsed_content: {
             items_count: items.length,
-            items_updated: itemsUpdated,
-            items_created: itemsCreated,
-            items_skipped: itemsSkipped,
+            active_items: activeItems.length,
             received_by: user.email,
-            unique_destinations: uniqueDestinations,
           },
         })
         .select('id')
@@ -213,41 +138,50 @@ export function useConfirmReceipt(onProgress?: (message: string) => void) {
 
       if (entryErr) throw entryErr
 
-      // Insert receiving_items
-      const itemRows = processedItems.map((item) => ({
-        receiving_entry_id: entry!.id,
-        sortly_item_id: item.final_sortly_item_id,
-        item_name: item.item_name,
-        part_number: item.part_number,
-        quantity_received: item.quantity_received,
-        action: item.action,
-        sortly_quantity_before: item.sortly_quantity_before,
-        sortly_quantity_after: item.sortly_quantity_after,
-        destination_folder_id: item.destination_folder_id || destination_folder_id,
-        destination_folder_name: item.destination_folder_name || project_name,
-        notes: item.notes,
-      }))
+      // Step 3: Build RPC payload and call confirm_receipt
+      onProgress?.('Updating inventory and purchase order...')
 
-      const { error: itemsErr } = await supabase
-        .from('receiving_items')
-        .insert(itemRows)
+      const rpcItems: ConfirmReceiptItemPayload[] = activeItems.map((item) =>
+        buildItemPayload(item, destination_location_id)
+      )
 
-      if (itemsErr) throw itemsErr
+      const { data: rpcResult, error: rpcErr } = await supabase.rpc('confirm_receipt', {
+        p_entry_id: entry!.id,
+        p_items: rpcItems,
+        p_notes: notes ?? null,
+      })
+
+      if (rpcErr) throw rpcErr
+
+      const result = rpcResult as {
+        success: boolean
+        entry_id: number
+        items_processed: number
+        po_id: number | null
+        po_status: string | null
+      }
+
+      if (!result.success) {
+        throw new Error('confirm_receipt RPC returned success=false')
+      }
 
       return {
-        entryId: entry!.id,
-        itemsUpdated,
-        itemsCreated,
-        itemsSkipped,
+        entryId: result.entry_id,
+        itemsProcessed: result.items_processed,
+        poId: result.po_id ?? null,
+        poStatus: result.po_status ?? null,
       }
     },
-    onSuccess: () => {
-      // Clear the custom field cache for next session
-      cachedFieldMap = null
 
-      // Invalidate receiving and Sortly caches
+    onSuccess: () => {
+      // Invalidate receiving (daily log + list)
       queryClient.invalidateQueries({ queryKey: receivingKeys.all })
-      queryClient.invalidateQueries({ queryKey: sortlyKeys.items() })
+      // Invalidate PO list/details (status may have changed)
+      queryClient.invalidateQueries({ queryKey: poKeys.all() })
+      // Invalidate inventory stock levels, items list, movements
+      queryClient.invalidateQueries({ queryKey: inventoryKeys.stockLevels() })
+      queryClient.invalidateQueries({ queryKey: inventoryKeys.items() })
+      queryClient.invalidateQueries({ queryKey: inventoryKeys.movements() })
     },
   })
 }

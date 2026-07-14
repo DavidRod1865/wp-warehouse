@@ -15,9 +15,13 @@ export interface Delivery {
   deleted_at: string | null
   from_address: Address
   to_address: Address
-  from_location_id: number
-  truck_sortly_folder_id: number
-  from_location_type: string
+  // Legacy Sortly columns — kept for old-row display only; new code uses below
+  from_location_id?: number | null
+  truck_sortly_folder_id?: number | null
+  from_location_type?: string | null
+  // Phase 5+ first-party columns
+  truck_location_id?: number | null
+  from_location_ref?: number | null
   truck_name?: string | null
   delivery_type: string
   signature_name: string | null
@@ -30,7 +34,10 @@ export interface Delivery {
 export interface DeliveryItem {
   id?: number
   delivery_id?: number
-  sortly_item_id: number | null
+  // Legacy Sortly column — kept for type completeness; new rows will be null
+  sortly_item_id?: number | null
+  // Phase 5+ first-party column
+  item_id?: number | null
   item_name: string
   quantity: number
   delivered_quantity: number
