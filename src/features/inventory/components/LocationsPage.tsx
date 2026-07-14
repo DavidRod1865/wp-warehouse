@@ -78,7 +78,7 @@ export default function LocationsPage() {
         ) : (
           <button
             onClick={() => setModal({ type: 'create' })}
-            className="px-4 py-2 rounded-lg text-white text-sm font-medium hover:opacity-90"
+            className="px-4 py-2 rounded-lg text-[var(--on-signal)] text-sm font-medium hover:opacity-90"
             style={{ background: 'var(--signal)' }}
           >
             <Icon name="plus" className="w-4 h-4 inline mr-1" />
@@ -346,7 +346,7 @@ function LocationFormModal({ type, location, locations, onClose }: LocationFormM
             Cancel
           </button>
           <button
-            className="px-3.5 py-2 rounded-lg text-white text-sm font-medium hover:opacity-90 disabled:opacity-50"
+            className="px-3.5 py-2 rounded-lg text-[var(--on-signal)] text-sm font-medium hover:opacity-90 disabled:opacity-50"
             style={{ background: 'var(--signal)' }}
             onClick={handleSave}
             disabled={!isValid || saving}

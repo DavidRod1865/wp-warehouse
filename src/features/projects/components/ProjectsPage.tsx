@@ -106,7 +106,7 @@ export default function ProjectsPage() {
 
         <button
           onClick={() => setModal({ type: 'create' })}
-          className="px-4 py-2 rounded-lg text-white text-sm font-medium hover:opacity-90"
+          className="px-4 py-2 rounded-lg text-[var(--on-signal)] text-sm font-medium hover:opacity-90"
           style={{ background: 'var(--signal)' }}
         >
           <Icon name="plus" className="w-4 h-4 inline mr-1" />

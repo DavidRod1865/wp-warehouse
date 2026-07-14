@@ -13,7 +13,7 @@
   --color-base-200: #f6f7f9;
   --color-base-300: #e4e7ec;
   --color-base-content: #0f1729;
-  --color-primary: #0f1729;
+  --color-primary: #1d4ed8;
   --color-primary-content: #ffffff;
   --color-secondary: #c47b1a;
   --color-secondary-content: #ffffff;
@@ -51,7 +51,7 @@
   --color-base-200: #0b1020;
   --color-base-300: #242d46;
   --color-base-content: #eef0f6;
-  --color-primary: #eef0f6;
+  --color-primary: #e4a256;
   --color-primary-content: #0b1020;
   --color-secondary: #e4a256;
   --color-secondary-content: #0b1020;
@@ -90,7 +90,8 @@
   --on-ink:     #ffffff;
   --muted:      #5c6478;
   --faint:      #98a1b2;
-  --signal:     #c47b1a;
+  --signal:     #1d4ed8;
+  --on-signal:  #ffffff;
   --ok:         #136c3a;
   --ok-soft:    #dcefe2;
   --info:       #1d4ed8;
@@ -120,6 +121,7 @@
   --muted:      #8b92a8;
   --faint:      #5d6683;
   --signal:     #e4a256;
+  --on-signal:  #0b1020;
   --ok:         #6ec48a;
   --ok-soft:    #153220;
   --info:       #93bbfd;
@@ -140,12 +142,45 @@
   filter: invert(1);
 }
 
-/* View toggle active state — blue in light, gold in dark */
-.view-toggle-active {
-  background: color-mix(in oklab, var(--info) 24%, var(--panel));
-  color: var(--info);
+/* Interactive accent — blue in light, orange/gold in dark.
+   Prefer var(--signal) for CTAs, links, active states, and focus. */
+.theme-accent {
+  color: var(--signal);
 }
-[data-theme="withpride-dark"] .view-toggle-active {
+
+.theme-row-hover {
+  transition: background-color 0.15s ease;
+}
+.theme-row-hover:hover {
+  background: color-mix(in oklab, var(--signal) 14%, var(--panel));
+}
+
+/* Filled CTA button (managers UI). Daisy btn-primary also follows --color-primary. */
+.btn-signal {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  border: none;
+  background: var(--signal);
+  color: var(--on-signal);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+.btn-signal:hover:not(:disabled) {
+  opacity: 0.9;
+}
+.btn-signal:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* View toggle active state */
+.view-toggle-active {
   background: color-mix(in oklab, var(--signal) 24%, var(--panel));
   color: var(--signal);
 }
@@ -174,10 +209,18 @@ html, body {
   transition: border-color 0.15s;
 }
 .form-input:focus {
-  border-color: var(--ink-2);
+  border-color: var(--signal);
 }
 .form-input::placeholder {
   color: var(--faint);
+}
+select.form-input {
+  padding-right: 2rem;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.65rem center;
+  background-size: 1rem;
 }
 
 /* ── Animations ─────────────────────────────────────────── */

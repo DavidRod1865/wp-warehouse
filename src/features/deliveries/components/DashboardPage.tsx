@@ -14,6 +14,7 @@ import type { Delivery, DeliveryStatus } from '../types'
 import { StatCard } from '../../../components/ui/StatCard'
 import { StatusChip } from '../../../components/ui/StatusChip'
 import { Icon } from '../../../components/ui/Icon'
+import { DeleteConfirmDialog } from '../../../components/ui/DeleteConfirmDialog'
 
 function getGreeting(): string {
   const h = new Date().getHours()
@@ -479,52 +480,24 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ── Delete confirmation modal ─────────────────── */}
-      {deliveryToDelete && (
-        <div
-          className="fixed inset-0 z-50 grid place-items-center p-10"
-          style={{
-            background: 'color-mix(in oklab, var(--ink) 35%, transparent)',
-            backdropFilter: 'blur(4px)',
-          }}
-          onClick={() => setDeliveryToDelete(null)}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="bg-[var(--panel)] rounded-xl w-full max-w-md overflow-hidden"
-            style={{ boxShadow: '0 20px 60px -20px rgba(15,23,41,.35), 0 0 0 1px var(--line)' }}
-          >
-            <div className="px-6 pt-5 pb-4">
-              <h3 className="text-lg font-semibold">Delete Delivery</h3>
-              <p className="mt-3 text-sm text-[var(--muted)]">
-                Are you sure you want to delete{' '}
-                <strong className="text-[var(--ink)]">{deliveryToDelete.delivery_number}</strong>?
-                {deliveryToDelete.status === 'pending' &&
-                  ' Stock will be returned to the source location.'}
-              </p>
-            </div>
-            <div className="flex justify-end gap-2 px-6 py-3.5 border-t border-[var(--line)]" style={{ background: 'color-mix(in oklab, var(--panel-2) 50%, var(--panel))' }}>
-              <button
-                className="px-3.5 py-2 rounded-lg border border-transparent bg-transparent text-[var(--ink-2)] text-sm font-medium hover:bg-[var(--panel-2)]"
-                onClick={() => setDeliveryToDelete(null)}
-              >
-                Cancel
-              </button>
-              <button
-                className="px-3.5 py-2 rounded-lg bg-[var(--danger)] text-white text-sm font-medium hover:opacity-90 disabled:opacity-50"
-                onClick={handleDelete}
-                disabled={deleteDelivery.isPending}
-              >
-                {deleteDelivery.isPending ? (
-                  <span className="loading loading-spinner loading-sm" />
-                ) : (
-                  'Delete'
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <DeleteConfirmDialog
+        open={!!deliveryToDelete}
+        itemType="delivery"
+        itemName={deliveryToDelete?.delivery_number ?? ''}
+        description={
+          deliveryToDelete ? (
+            <>
+              Are you sure you want to delete{' '}
+              <strong className="text-[var(--ink)]">{deliveryToDelete.delivery_number}</strong>?
+              {deliveryToDelete.status === 'pending' &&
+                ' Stock will be returned to the source location.'}
+            </>
+          ) : null
+        }
+        loading={deleteDelivery.isPending}
+        onConfirm={handleDelete}
+        onCancel={() => setDeliveryToDelete(null)}
+      />
     </div>
   )
 }

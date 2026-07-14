@@ -336,8 +336,8 @@ export function ItemMatchModal({
               </div>
               <button
                 onClick={handleCreateNew}
-                className="px-5 py-2.5 rounded-lg text-sm font-medium text-white"
-                style={{ background: 'var(--info)' }}
+                className="px-5 py-2.5 rounded-lg text-sm font-medium text-[var(--on-signal)]"
+                style={{ background: 'var(--signal)' }}
               >
                 Create "{itemName}"
               </button>

@@ -231,7 +231,7 @@ export function ItemSelectorModal({
                         background: isSelected ? 'var(--signal)' : 'transparent',
                       }}
                     >
-                      {isSelected && <Icon name="check" className="w-2.5 h-2.5 text-white" />}
+                      {isSelected && <Icon name="check" className="w-2.5 h-2.5 text-[var(--on-signal)]" />}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-[var(--ink)] truncate">{item.name}</p>
@@ -309,7 +309,7 @@ export function ItemSelectorModal({
             <button
               disabled={selected.size === 0}
               onClick={handleConfirm}
-              className="px-4 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-40"
+              className="px-4 py-2 rounded-lg text-sm font-medium text-[var(--on-signal)] disabled:opacity-40"
               style={{ background: 'var(--signal)' }}
             >
               Add items

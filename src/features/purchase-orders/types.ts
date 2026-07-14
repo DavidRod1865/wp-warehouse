@@ -17,7 +17,11 @@ export interface PurchaseOrder {
   updated_at: string
   // Joined data
   vendor?: { id: number; name: string }
-  project?: { id: number; name: string }
+  project?: {
+    id: number
+    name: string
+    general_contractors?: { id: number; company_name: string } | null
+  }
 }
 
 export interface POLineItem {
@@ -65,6 +69,17 @@ export interface ParsedPurchaseOrder {
  * Form data for creating/editing a PO
  * Note: vendor_id is stored as number in forms (number in DB is converted to number by Supabase)
  */
+export interface POFormLine {
+  /** Present when editing an existing line */
+  id?: number
+  line_number: number
+  description: string
+  part_number: string | null
+  quantity_ordered: number
+  unit_price: number | null
+  notes: string | null
+}
+
 export interface POFormData {
   po_number: string
   vendor_id: number
@@ -72,13 +87,6 @@ export interface POFormData {
   po_date: string | null
   pricing_mode?: 'per_line' | 'lump_sum'
   lump_sum_amount: number | null
-  lines: {
-    line_number: number
-    description: string
-    part_number: string | null
-    quantity_ordered: number
-    unit_price: number | null
-    notes: string | null
-  }[]
+  lines: POFormLine[]
   notes: string | null
 }

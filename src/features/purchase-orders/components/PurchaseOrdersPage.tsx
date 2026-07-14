@@ -4,16 +4,22 @@
  * List all POs, filter by project/status, view details, create new
  */
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { usePurchaseOrders } from '../hooks/usePurchaseOrders'
+import { useProjects } from '../../projects/hooks/useProjects'
+import { useVendors } from '../../vendors/hooks/useVendors'
 import { Icon } from '../../../components/ui/Icon'
 import { UploadPoModal } from './UploadPoModal'
 import type { PurchaseOrder } from '../types'
 
 interface FilterState {
   status?: string
+  project_id?: number
+  vendor_id?: number
   search: string
 }
+
+type SortKey = 'po_number' | 'vendor' | 'project' | 'po_date' | 'status' | 'received'
 
 interface POWithLineItems extends PurchaseOrder {
   line_items?: Array<{
@@ -33,10 +39,34 @@ interface POWithLineItems extends PurchaseOrder {
   }>
 }
 
+const STATUS_ORDER: Record<string, number> = {
+  draft: 0,
+  confirmed: 1,
+  partially_received: 2,
+  received: 3,
+  cancelled: 4,
+}
+
+function projectLabel(po: PurchaseOrder): string {
+  const name = po.project?.name
+  if (!name) return 'Unknown'
+  const gc = po.project?.general_contractors?.company_name
+  return gc ? `${gc} - ${name}` : name
+}
+
+function receivedProgress(po: POWithLineItems): { label: string; ratio: number } {
+  const total = po.line_items?.length || 0
+  const received = po.line_items?.filter((l) => l.received_status === 'received').length || 0
+  return {
+    label: total > 0 ? `${received}/${total}` : '—',
+    ratio: total > 0 ? received / total : -1,
+  }
+}
+
 function StatusBadge({ status }: { status: string }) {
   const colors: Record<string, { bg: string; text: string }> = {
     draft: { bg: 'var(--panel-2)', text: 'var(--muted)' },
-    confirmed: { bg: 'color-mix(in oklab, var(--signal) 20%, var(--panel))', text: 'var(--signal)' },
+    confirmed: { bg: 'color-mix(in oklab, var(--ok) 20%, var(--panel))', text: 'var(--ok)' },
     partially_received: { bg: 'color-mix(in oklab, var(--warning) 20%, var(--panel))', text: 'var(--warning)' },
     received: { bg: 'color-mix(in oklab, var(--success) 20%, var(--panel))', text: 'var(--success)' },
     cancelled: { bg: 'color-mix(in oklab, var(--danger) 20%, var(--panel))', text: 'var(--danger)' },
@@ -61,139 +91,325 @@ function StatusBadge({ status }: { status: string }) {
   )
 }
 
-function PoRow({ po }: { po: POWithLineItems }) {
-  const totalLines = po.line_items?.length || 0
-  const receivedLines = po.line_items?.filter((l) => l.received_status === 'received').length || 0
+function SortableTh({
+  label,
+  sortKey,
+  activeKey,
+  dir,
+  onSort,
+  align = 'left',
+}: {
+  label: string
+  sortKey: SortKey
+  activeKey: SortKey
+  dir: 'asc' | 'desc'
+  onSort: (key: SortKey) => void
+  align?: 'left' | 'center' | 'right'
+}) {
+  const active = activeKey === sortKey
+  const alignClass =
+    align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left'
+  const buttonAlign =
+    align === 'right'
+      ? 'flex-row-reverse ml-auto'
+      : align === 'center'
+        ? 'mx-auto'
+        : ''
 
   return (
-    <tr className="border-b border-[var(--line)] hover:bg-[var(--panel-2)] transition-colors">
-      <td className="px-4 py-3 text-sm font-medium text-[var(--ink)]">
-        <Link to={`/purchase-orders/${po.id}`} className="text-[var(--signal)] hover:underline">
-          {po.po_number}
-        </Link>
+    <th className={`px-4 py-3 font-semibold text-[var(--ink)] ${alignClass}`}>
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        className={`inline-flex items-center gap-1 hover:opacity-80 ${buttonAlign} ${
+          active ? 'theme-accent' : ''
+        }`}
+      >
+        {label}
+        <Icon
+          name="sortAsc"
+          className={`w-3 h-3 opacity-40 ${active ? 'opacity-100' : ''} ${
+            active && dir === 'desc' ? 'rotate-180' : ''
+          }`}
+        />
+      </button>
+    </th>
+  )
+}
+
+function PoRow({ po }: { po: POWithLineItems }) {
+  const navigate = useNavigate()
+  const { label: receivedLabel } = receivedProgress(po)
+  const href = `/purchase-orders/${po.id}`
+
+  return (
+    <tr
+      role="link"
+      tabIndex={0}
+      className="theme-row-hover border-b border-[var(--line)] cursor-pointer"
+      onClick={() => navigate(href)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          navigate(href)
+        }
+      }}
+    >
+      <td className="theme-accent px-4 py-3 text-sm font-medium">
+        {po.po_number}
       </td>
       <td className="px-4 py-3 text-sm text-[var(--ink-2)]">
         {po.vendor?.name || 'Unknown'}
       </td>
       <td className="px-4 py-3 text-sm text-[var(--ink-2)]">
-        {po.project?.name || 'Unknown'}
+        {projectLabel(po)}
       </td>
       <td className="px-4 py-3 text-sm text-[var(--ink-2)]">
         {po.po_date ? new Date(po.po_date).toLocaleDateString() : '—'}
       </td>
+      <td className="px-4 py-3 text-center text-sm text-[var(--muted)]">
+        {receivedLabel}
+      </td>
       <td className="px-4 py-3 text-center">
         <StatusBadge status={po.status} />
-      </td>
-      <td className="px-4 py-3 text-center text-sm text-[var(--muted)]">
-        {totalLines > 0 ? `${receivedLines}/${totalLines}` : '—'}
-      </td>
-      <td className="px-4 py-3 text-right">
-        <Link
-          to={`/purchase-orders/${po.id}`}
-          className="inline-flex items-center justify-center w-8 h-8 rounded hover:bg-[var(--panel-2)] transition-colors"
-          title="View details"
-        >
-          <Icon name="arrow-right" className="w-4 h-4 text-[var(--ink-2)]" />
-        </Link>
       </td>
     </tr>
   )
 }
 
+function sortValue(po: POWithLineItems, key: SortKey): string | number {
+  switch (key) {
+    case 'po_number':
+      return po.po_number
+    case 'vendor':
+      return po.vendor?.name || ''
+    case 'project':
+      return projectLabel(po)
+    case 'po_date':
+      return po.po_date || ''
+    case 'status':
+      return STATUS_ORDER[po.status] ?? 99
+    case 'received':
+      return receivedProgress(po).ratio
+  }
+}
+
 export default function PurchaseOrdersPage() {
   const [filters, setFilters] = useState<FilterState>({ search: '' })
   const [showModal, setShowModal] = useState(false)
+  const [sortKey, setSortKey] = useState<SortKey>('po_date')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
+  const { data: projects = [] } = useProjects()
+  const { data: vendors = [] } = useVendors()
   const { data: pos = [], isLoading } = usePurchaseOrders({
     status: filters.status,
-    search: filters.search,
+    project_id: filters.project_id,
+    vendor_id: filters.vendor_id,
   })
 
+  const sortedProjects = [...projects].sort((a, b) => {
+    const al = a.general_contractor ? `${a.general_contractor} - ${a.name}` : a.name
+    const bl = b.general_contractor ? `${b.general_contractor} - ${b.name}` : b.name
+    return al.localeCompare(bl, undefined, { sensitivity: 'base' })
+  })
+
+  const searchLower = filters.search.trim().toLowerCase()
+  const filtered = searchLower
+    ? pos.filter((po) => {
+        const haystack = [
+          po.po_number,
+          po.notes,
+          po.vendor?.name,
+          po.project?.name,
+          po.project?.general_contractors?.company_name,
+          projectLabel(po),
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+        return haystack.includes(searchLower)
+      })
+    : pos
+
+  const displayed = [...filtered].sort((a, b) => {
+    const av = sortValue(a, sortKey)
+    const bv = sortValue(b, sortKey)
+
+    let cmp = 0
+    if (typeof av === 'number' && typeof bv === 'number') {
+      cmp = av - bv
+    } else {
+      cmp = String(av).localeCompare(String(bv), undefined, {
+        sensitivity: 'base',
+        numeric: true,
+      })
+    }
+    return sortDir === 'asc' ? cmp : -cmp
+  })
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortKey(key)
+      setSortDir(key === 'po_date' || key === 'received' ? 'desc' : 'asc')
+    }
+  }
+
+  const hasActiveFilters = Boolean(
+    filters.search || filters.status || filters.project_id || filters.vendor_id,
+  )
   const statuses = ['draft', 'confirmed', 'partially_received', 'received', 'cancelled']
 
   return (
-    <div className="p-6 max-w-[1400px] mx-auto">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-[var(--ink)]">Purchase Orders</h1>
-        <p className="text-[var(--muted)] mt-1">Manage POs from vendors and track receipts</p>
-      </div>
+    <div className="w-full pb-6">
+      <div className="px-6 pt-6">
+        {/* Header */}
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold text-[var(--ink)]">Purchase Orders</h1>
+          <p className="text-[var(--muted)] mt-1">Manage POs from vendors and track received inventory</p>
+        </div>
 
-      {/* Filter Bar */}
-      <div className="mb-6 flex gap-3 items-end flex-wrap">
-        {/* Status Filter */}
-        <div>
-          <label className="block text-xs text-[var(--muted)] uppercase mb-2" style={{ fontFamily: 'var(--mono)' }}>
-            Status
-          </label>
-          <select
-            value={filters.status || ''}
-            onChange={(e) => setFilters({ ...filters, status: e.target.value || undefined })}
-            className="form-input"
+        {/* Filter Bar */}
+        <div className="mb-6 flex gap-3 items-end flex-wrap">
+          {/* Search */}
+          <div className="flex-1 min-w-48">
+            <label className="block text-xs text-[var(--muted)] uppercase mb-2" style={{ fontFamily: 'var(--mono)' }}>
+              Search
+            </label>
+            <input
+              type="text"
+              value={filters.search}
+              onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+              placeholder="PO #, vendor, GC, or project..."
+              className="form-input w-full"
+            />
+          </div>
+
+          {/* Project Filter */}
+          <div className="min-w-52 max-w-72 flex-1">
+            <label className="block text-xs text-[var(--muted)] uppercase mb-2" style={{ fontFamily: 'var(--mono)' }}>
+              Project
+            </label>
+            <select
+              value={filters.project_id ?? ''}
+              onChange={(e) =>
+                setFilters({
+                  ...filters,
+                  project_id: e.target.value ? Number(e.target.value) : undefined,
+                })
+              }
+              className="form-input w-full"
+            >
+              <option value="">All projects</option>
+              {sortedProjects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.general_contractor
+                    ? `${project.general_contractor} - ${project.name}`
+                    : project.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Vendor Filter */}
+          <div className="min-w-44 max-w-64">
+            <label className="block text-xs text-[var(--muted)] uppercase mb-2" style={{ fontFamily: 'var(--mono)' }}>
+              Vendor
+            </label>
+            <select
+              value={filters.vendor_id ?? ''}
+              onChange={(e) =>
+                setFilters({
+                  ...filters,
+                  vendor_id: e.target.value ? Number(e.target.value) : undefined,
+                })
+              }
+              className="form-input w-full"
+            >
+              <option value="">All vendors</option>
+              {vendors.map((vendor) => (
+                <option key={vendor.id} value={vendor.id}>
+                  {vendor.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Status Filter */}
+          <div>
+            <label className="block text-xs text-[var(--muted)] uppercase mb-2" style={{ fontFamily: 'var(--mono)' }}>
+              Status
+            </label>
+            <select
+              value={filters.status || ''}
+              onChange={(e) => setFilters({ ...filters, status: e.target.value || undefined })}
+              className="form-input"
+            >
+              <option value="">All Statuses</option>
+              {statuses.map((s) => (
+                <option key={s} value={s}>
+                  {s.replace(/_/g, ' ').charAt(0).toUpperCase() + s.replace(/_/g, ' ').slice(1)}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* New PO Button */}
+          <button
+            onClick={() => setShowModal(true)}
+            className="px-4 py-2 rounded-lg text-[var(--on-signal)] text-sm font-medium hover:opacity-90"
+            style={{ background: 'var(--signal)' }}
           >
-            <option value="">All statuses</option>
-            {statuses.map((s) => (
-              <option key={s} value={s}>
-                {s.replace(/_/g, ' ')}
-              </option>
-            ))}
-          </select>
+            <Icon name="plus" className="w-4 h-4 inline mr-1" />
+            New PO
+          </button>
         </div>
-
-        {/* Search */}
-        <div className="flex-1 min-w-64">
-          <label className="block text-xs text-[var(--muted)] uppercase mb-2" style={{ fontFamily: 'var(--mono)' }}>
-            Search
-          </label>
-          <input
-            type="text"
-            value={filters.search}
-            onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-            placeholder="PO number or notes..."
-            className="form-input w-full"
-          />
-        </div>
-
-        {/* New PO Button */}
-        <button
-          onClick={() => setShowModal(true)}
-          className="px-4 py-2 rounded-lg text-white text-sm font-medium hover:opacity-90"
-          style={{ background: 'var(--signal)' }}
-        >
-          <Icon name="plus" className="w-4 h-4 inline mr-1" />
-          New PO
-        </button>
       </div>
 
-      {/* POs Table */}
-      <div className="overflow-x-auto">
+      {/* POs Table — full width of content area */}
+      <div className="overflow-x-auto w-full">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-[var(--line)]">
-              <th className="px-4 py-3 text-left font-semibold text-[var(--ink)]">PO #</th>
-              <th className="px-4 py-3 text-left font-semibold text-[var(--ink)]">Vendor</th>
-              <th className="px-4 py-3 text-left font-semibold text-[var(--ink)]">Project</th>
-              <th className="px-4 py-3 text-left font-semibold text-[var(--ink)]">Date</th>
-              <th className="px-4 py-3 text-center font-semibold text-[var(--ink)]">Status</th>
-              <th className="px-4 py-3 text-center font-semibold text-[var(--ink)]">Received</th>
-              <th className="px-4 py-3 text-right font-semibold text-[var(--ink)]">Action</th>
+              <SortableTh label="PO #" sortKey="po_number" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+              <SortableTh label="Vendor" sortKey="vendor" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+              <SortableTh label="Project" sortKey="project" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+              <SortableTh label="Issue Date" sortKey="po_date" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+              <SortableTh
+                label="Received"
+                sortKey="received"
+                activeKey={sortKey}
+                dir={sortDir}
+                onSort={handleSort}
+                align="center"
+              />
+              <SortableTh
+                label="Status"
+                sortKey="status"
+                activeKey={sortKey}
+                dir={sortDir}
+                onSort={handleSort}
+                align="center"
+              />
             </tr>
           </thead>
           <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-[var(--muted)]">
+                <td colSpan={6} className="px-4 py-8 text-center text-[var(--muted)]">
                   <span className="loading loading-spinner loading-sm" />
                 </td>
               </tr>
-            ) : pos.length === 0 ? (
+            ) : displayed.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-[var(--muted)]">
-                  {filters.search || filters.status ? 'No matching purchase orders' : 'No purchase orders yet'}
+                <td colSpan={6} className="px-4 py-8 text-center text-[var(--muted)]">
+                  {hasActiveFilters ? 'No matching purchase orders' : 'No purchase orders yet'}
                 </td>
               </tr>
             ) : (
-              pos.map((po) => (
+              displayed.map((po) => (
                 <PoRow key={po.id} po={po} />
               ))
             )}

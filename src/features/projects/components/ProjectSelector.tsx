@@ -11,6 +11,12 @@ interface ProjectSelectorProps {
   className?: string
 }
 
+function projectLabel(project: { name: string; general_contractor?: string }): string {
+  return project.general_contractor
+    ? `${project.general_contractor} - ${project.name}`
+    : project.name
+}
+
 export function ProjectSelector({
   value,
   onChange,
@@ -18,6 +24,10 @@ export function ProjectSelector({
   className = 'form-input',
 }: ProjectSelectorProps) {
   const { data: projects = [] } = useProjects({ activeOnly: true })
+
+  const sortedProjects = [...projects].sort((a, b) =>
+    projectLabel(a).localeCompare(projectLabel(b), undefined, { sensitivity: 'base' }),
+  )
 
   return (
     <select
@@ -27,9 +37,9 @@ export function ProjectSelector({
       disabled={disabled}
     >
       <option value="">Select project…</option>
-      {projects.map((project) => (
+      {sortedProjects.map((project) => (
         <option key={project.id} value={project.id}>
-          {project.name}
+          {projectLabel(project)}
         </option>
       ))}
     </select>

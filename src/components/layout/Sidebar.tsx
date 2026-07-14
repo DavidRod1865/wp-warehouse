@@ -61,7 +61,7 @@ function NavSection({ title, items, onClose }: { title: string; items: NavItem[]
           className={({ isActive }) =>
             `group flex items-center gap-2.5 px-2.5 py-2 rounded-[7px] text-sm no-underline relative
             ${isActive
-              ? 'bg-[var(--panel-2)] text-[var(--ink)] font-medium'
+              ? 'bg-[color-mix(in_oklab,var(--signal)_12%,var(--panel))] text-[var(--signal)] font-medium'
               : 'text-[var(--ink-2)] hover:bg-[var(--panel-2)]'
             }`
           }
@@ -69,11 +69,11 @@ function NavSection({ title, items, onClose }: { title: string; items: NavItem[]
           {({ isActive }) => (
             <>
               {isActive && (
-                <span className="absolute -left-2.5 top-1.5 bottom-1.5 w-[3px] rounded-r bg-[var(--ink)]" />
+                <span className="absolute -left-2.5 top-1.5 bottom-1.5 w-[3px] rounded-r bg-[var(--signal)]" />
               )}
               <Icon
                 name={item.icon}
-                className={`w-4 h-4 shrink-0 ${isActive ? 'text-[var(--ink)]' : 'text-[var(--muted)]'}`}
+                className={`w-4 h-4 shrink-0 ${isActive ? 'text-[var(--signal)]' : 'text-[var(--muted)]'}`}
               />
               {item.label}
             </>

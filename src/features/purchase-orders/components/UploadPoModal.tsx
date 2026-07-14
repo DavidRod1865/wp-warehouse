@@ -620,7 +620,7 @@ export function UploadPoModal({ onClose }: UploadPoModalProps) {
                 <button
                   type="submit"
                   disabled={isSubmitting || createPo.isPending}
-                  className="flex-1 px-4 py-2 rounded-lg text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 px-4 py-2 rounded-lg text-[var(--on-signal)] text-sm font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{ background: 'var(--signal)' }}
                 >
                   {isSubmitting || createPo.isPending ? 'Saving...' : 'Save & Confirm'}

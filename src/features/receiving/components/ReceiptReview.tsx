@@ -324,7 +324,7 @@ export function ReceiptReview({
         <button
           onClick={handleConfirm}
           disabled={!canConfirm}
-          className="flex items-center gap-1.5 px-5 py-2.5 rounded-lg text-sm font-medium text-white disabled:opacity-40"
+          className="flex items-center gap-1.5 px-5 py-2.5 rounded-lg text-sm font-medium text-[var(--on-signal)] disabled:opacity-40"
           style={{ background: 'var(--signal)' }}
         >
           {isProcessing ? (

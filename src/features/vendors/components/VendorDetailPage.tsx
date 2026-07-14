@@ -20,7 +20,7 @@ import type { ReceivingEntry } from '../../receiving/types'
 function StatusBadge({ status }: { status: string }) {
   const colors: Record<string, { bg: string; text: string }> = {
     draft: { bg: 'var(--panel-2)', text: 'var(--muted)' },
-    confirmed: { bg: 'color-mix(in oklab, var(--signal) 20%, var(--panel))', text: 'var(--signal)' },
+    confirmed: { bg: 'color-mix(in oklab, var(--ok) 20%, var(--panel))', text: 'var(--ok)' },
     partially_received: { bg: 'color-mix(in oklab, var(--warning) 20%, var(--panel))', text: 'var(--warning)' },
     received: { bg: 'color-mix(in oklab, var(--success) 20%, var(--panel))', text: 'var(--success)' },
     cancelled: { bg: 'color-mix(in oklab, var(--danger) 20%, var(--panel))', text: 'var(--danger)' },

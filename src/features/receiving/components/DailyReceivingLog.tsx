@@ -123,7 +123,7 @@ export function DailyReceivingLog() {
           <button
             onClick={handlePrint}
             disabled={stats.entryCount === 0}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-40 transition-opacity"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium text-[var(--on-signal)] disabled:opacity-40 transition-opacity"
             style={{ background: 'var(--signal)' }}
           >
             <Icon name="download" className="w-3.5 h-3.5" />

@@ -15,6 +15,7 @@ function nullableNumber() {
 }
 
 export const poLineItemSchema = z.object({
+  id: z.number().int().positive().optional(),
   line_number: z.number().int().positive(),
   description: z.string().min(1, 'Description is required'),
   part_number: z.string().nullable(),
