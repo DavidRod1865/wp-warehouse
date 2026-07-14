@@ -46,7 +46,7 @@ export default function ReceivingPage() {
 
         <button
           onClick={() => setModalOpen(true)}
-          className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-medium text-white shrink-0 transition-opacity hover:opacity-90"
+          className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-medium text-[var(--on-signal)] shrink-0 transition-opacity hover:opacity-90"
           style={{ background: 'var(--signal)' }}
         >
           <Icon name="plus" className="w-3.5 h-3.5" />

@@ -10,14 +10,12 @@ interface UsePurchaseOrdersOptions {
   project_id?: number
   vendor_id?: number
   status?: string
-  search?: string
 }
 
 export function usePurchaseOrders({
   project_id,
   vendor_id,
   status,
-  search = '',
 }: UsePurchaseOrdersOptions = {}) {
   return useQuery({
     queryKey: poKeys.list({ project_id, vendor_id, status }),
@@ -28,7 +26,7 @@ export function usePurchaseOrders({
           `
           *,
           vendor:vendors(id, name),
-          project:projects(id, name),
+          project:projects(id, name, general_contractors(id, company_name)),
           line_items:po_line_items(*)
           `
         )
@@ -43,12 +41,6 @@ export function usePurchaseOrders({
 
       if (status) {
         query = query.eq('status', status)
-      }
-
-      if (search) {
-        query = query.or(
-          `po_number.ilike.%${search}%,notes.ilike.%${search}%`
-        )
       }
 
       const { data, error } = await query.order('created_at', {
@@ -93,7 +85,7 @@ export function usePurchaseOrder(id: number) {
           `
           *,
           vendor:vendors(id, name),
-          project:projects(id, name),
+          project:projects(id, name, general_contractors(id, company_name)),
           line_items:po_line_items(*)
           `
         )

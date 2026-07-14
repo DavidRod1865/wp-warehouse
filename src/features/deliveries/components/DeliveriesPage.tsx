@@ -14,6 +14,7 @@ import { DriverTimeline } from '../../../components/ui/DriverTimeline'
 import { StatusChip } from '../../../components/ui/StatusChip'
 import { ProgressBar } from '../../../components/ui/ProgressBar'
 import { Icon } from '../../../components/ui/Icon'
+import { DeleteConfirmDialog } from '../../../components/ui/DeleteConfirmDialog'
 import type { Delivery } from '../types'
 
 type Tab = 'all' | 'open' | 'today' | 'delivered'
@@ -139,7 +140,7 @@ export default function DeliveriesPage() {
           </button>
           <button
             onClick={() => navigate('/deliveries/new')}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-white"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-[var(--on-signal)]"
             style={{ background: 'var(--signal)' }}
           >
             <Icon name="plus" className="w-3.5 h-3.5" />
@@ -277,51 +278,14 @@ export default function DeliveriesPage() {
         )}
       </div>
 
-      {/* Delete modal */}
-      {deleteTarget && (
-        <div
-          className="fixed inset-0 z-50 grid place-items-center p-10"
-          style={{
-            background: 'color-mix(in oklab, var(--ink) 35%, transparent)',
-            backdropFilter: 'blur(4px)',
-          }}
-          onClick={() => setDeleteTarget(null)}
-        >
-          <div
-            className="bg-[var(--panel)] rounded-xl p-6 w-full max-w-md"
-            style={{ boxShadow: '0 20px 60px -20px rgba(15,23,41,.35), 0 0 0 1px var(--line)' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3
-              className="text-[var(--ink)]"
-              style={{ fontFamily: 'var(--serif)', fontSize: 18, fontWeight: 500 }}
-            >
-              Delete delivery?
-            </h3>
-            <p className="text-[var(--ink-2)] text-sm mt-2">
-              This will permanently delete{' '}
-              <b className="text-[var(--ink)]">{deleteTarget.delivery_number}</b>. This action
-              cannot be undone.
-            </p>
-            <div className="flex gap-2 justify-end mt-5">
-              <button
-                onClick={() => setDeleteTarget(null)}
-                className="px-4 py-2 rounded-lg border border-[var(--line)] text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--panel-2)]"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDelete}
-                disabled={deleteDelivery.isPending}
-                className="px-4 py-2 rounded-lg text-sm font-medium text-white"
-                style={{ background: 'var(--danger)' }}
-              >
-                {deleteDelivery.isPending ? 'Deleting...' : 'Delete'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <DeleteConfirmDialog
+        open={!!deleteTarget}
+        itemType="delivery"
+        itemName={deleteTarget?.delivery_number ?? ''}
+        loading={deleteDelivery.isPending}
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   )
 }

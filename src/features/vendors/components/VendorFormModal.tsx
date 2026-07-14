@@ -245,7 +245,7 @@ export function VendorFormModal({ vendor, onClose }: VendorFormModalProps) {
             </button>
             <button
               type="submit"
-              className="px-3 py-2 rounded-lg text-sm text-white hover:opacity-90"
+              className="px-3 py-2 rounded-lg text-sm text-[var(--on-signal)] hover:opacity-90"
               style={{ background: 'var(--signal)' }}
               disabled={saving}
             >
