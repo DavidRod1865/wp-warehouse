@@ -32,6 +32,11 @@ import { ComingSoon } from '../components/shared/ComingSoon'
 
 const LoginPage = lazy(() => import('../features/auth/components/LoginPage'))
 const DriverLoginPage = lazy(() => import('../features/auth/components/DriverLoginPage'))
+
+// Driver PWA pages
+const DriverDeliveriesPage = lazy(() => import('../features/driver/components/DriverDeliveriesPage'))
+const DriverDeliveryDetailPage = lazy(() => import('../features/driver/components/DriverDeliveryDetailPage'))
+const DriverSettingsPage = lazy(() => import('../features/driver/components/DriverSettingsPage'))
 const DashboardPage = lazy(() => import('../features/deliveries/components/DashboardPage'))
 const CreateDeliveryPage = lazy(() => import('../features/deliveries/components/CreateDeliveryPage'))
 const EditDeliveryPage = lazy(() => import('../features/deliveries/components/EditDeliveryPage'))
@@ -92,9 +97,9 @@ export const router = createBrowserRouter([
       {
         element: <DriverLayout />,
         children: [
-          { path: '/driver/deliveries', element: <ComingSoon /> },
-          { path: '/driver/deliveries/:id', element: <ComingSoon /> },
-          { path: '/driver/settings', element: <ComingSoon /> },
+          { path: '/driver/deliveries', element: <DriverDeliveriesPage /> },
+          { path: '/driver/deliveries/:id', element: <DriverDeliveryDetailPage /> },
+          { path: '/driver/settings', element: <DriverSettingsPage /> },
         ],
       },
     ],

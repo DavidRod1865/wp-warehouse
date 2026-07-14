@@ -15,9 +15,9 @@ export default defineConfig({
     },
 
     manifest: {
-      name: 'warehouse',
-      short_name: 'warehouse',
-      description: 'warehouse',
+      name: 'WP Warehouse',
+      short_name: 'WP Warehouse',
+      description: 'WP Warehouse — delivery and inventory management',
       theme_color: '#ffffff',
     },
 
