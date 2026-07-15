@@ -26,6 +26,7 @@ interface ReceiptReviewProps {
   projectName: string | null
   notes: string
   items: ReceivingLineItem[]
+  packingListFile: File | null
   onBack: () => void
   onConfirmed: () => void
 }
@@ -42,6 +43,7 @@ export function ReceiptReview({
   projectName,
   notes,
   items,
+  packingListFile,
   onBack,
   onConfirmed,
 }: ReceiptReviewProps) {
@@ -75,6 +77,7 @@ export function ReceiptReview({
       project_id: projectId,
       notes: notes || null,
       items: activeItems,
+      packing_list_file: packingListFile,
     }
 
     try {

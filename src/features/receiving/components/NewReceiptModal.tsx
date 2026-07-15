@@ -10,8 +10,17 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { ReceiptHeaderForm } from './ReceiptHeaderForm'
 import { ReceiptLineItems } from './ReceiptLineItems'
 import { ReceiptReview } from './ReceiptReview'
+import { CreatePoFromPackingList } from './CreatePoFromPackingList'
 import { Icon } from '../../../components/ui/Icon'
 import type { ReceivingLineItem } from '../types'
+
+/**
+ * Sub-phase within Step 1 (kept out of the 3-step indicator):
+ *  - form:       the header form
+ *  - po-choice:  no PO linked but items parsed → offer to create one
+ *  - po-create:  the inline "create PO from packing list" panel
+ */
+type HeaderPhase = 'form' | 'po-choice' | 'po-create'
 
 const STEPS = [
   { num: 1, label: 'Receipt info' },
@@ -41,6 +50,7 @@ function ModalContents({
   onConfirmed: () => void
 }) {
   const [step, setStep] = useState(1)
+  const [headerPhase, setHeaderPhase] = useState<HeaderPhase>('form')
 
   // Step 1 state
   const [vendor, setVendor] = useState('')
@@ -59,6 +69,9 @@ function ModalContents({
   // Step 2 state
   const [items, setItems] = useState<ReceivingLineItem[]>([])
   const [isManualEntry, setIsManualEntry] = useState(false)
+
+  // Packing-list PDF to archive with the receipt (optional)
+  const [packingListFile, setPackingListFile] = useState<File | null>(null)
 
   const hasUnsavedWork = vendor.trim().length > 0 || items.length > 0 || step > 1
 
@@ -90,14 +103,37 @@ function ModalContents({
     return () => { document.body.style.overflow = prev }
   }, [])
 
+  // Advance from the header form. When no PO is linked but a packing list was
+  // parsed, offer to create a PO from it; otherwise go straight to Step 2.
+  const handleHeaderNext = (source: 'parsed' | 'manual') => {
+    if (source === 'parsed' && poId == null) {
+      setHeaderPhase('po-choice')
+    } else {
+      setStep(2)
+    }
+  }
+
+  const backToHeaderForm = () => {
+    setHeaderPhase('form')
+    setStep(1)
+  }
+
   const titleForStep = (() => {
-    if (step === 1) return 'New receipt'
+    if (step === 1) {
+      if (headerPhase === 'po-choice') return 'No purchase order linked'
+      if (headerPhase === 'po-create') return 'Create PO from packing list'
+      return 'New receipt'
+    }
     if (step === 2) return `Review items — ${destinationLocationName ?? 'Select location'}`
     return 'Confirm receipt'
   })()
 
   const subtitleForStep = (() => {
-    if (step === 1) return 'Enter shipment details and upload a packing list or add items manually.'
+    if (step === 1) {
+      if (headerPhase === 'po-choice') return 'Create a purchase order from this packing list, or receive without one.'
+      if (headerPhase === 'po-create') return 'Verify the parsed details, then create the PO to track receipts against.'
+      return 'Enter shipment details and upload a packing list or add items manually.'
+    }
     if (step === 2) {
       return isManualEntry
         ? 'Add items and link them to inventory or PO lines.'
@@ -203,13 +239,13 @@ function ModalContents({
         <div className="flex-1 min-h-0 overflow-y-auto p-6">
           <AnimatePresence mode="wait">
             <motion.div
-              key={step}
+              key={step === 1 ? `1-${headerPhase}` : step}
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -6 }}
               transition={{ duration: 0.18, ease: [0.4, 0, 0.2, 1] }}
             >
-              {step === 1 && (
+              {step === 1 && headerPhase === 'form' && (
                 <ReceiptHeaderForm
                   vendor={vendor}
                   setVendor={setVendor}
@@ -231,9 +267,36 @@ function ModalContents({
                   setDestinationLocationName={setDestinationLocationName}
                   notes={notes}
                   setNotes={setNotes}
+                  packingListFile={packingListFile}
+                  setPackingListFile={setPackingListFile}
                   onItemsParsed={(parsedItems) => setItems(parsedItems)}
                   onManualEntry={() => setIsManualEntry(true)}
-                  onNext={() => setStep(2)}
+                  onNext={handleHeaderNext}
+                />
+              )}
+
+              {step === 1 && headerPhase === 'po-choice' && (
+                <PoChoice
+                  onCreate={() => setHeaderPhase('po-create')}
+                  onSkip={() => setStep(2)}
+                  onBack={backToHeaderForm}
+                />
+              )}
+
+              {step === 1 && headerPhase === 'po-create' && (
+                <CreatePoFromPackingList
+                  vendor={vendor}
+                  vendorId={vendorId}
+                  poNumber={poNumber}
+                  defaultProjectId={selectedProjectId}
+                  parsedItems={items}
+                  onCreated={(newPoId, newPoNumber) => {
+                    setPoId(newPoId)
+                    setPoNumber(newPoNumber)
+                    setHeaderPhase('form')
+                    setStep(2)
+                  }}
+                  onBack={() => setHeaderPhase('po-choice')}
                 />
               )}
 
@@ -245,7 +308,7 @@ function ModalContents({
                   destinationLocationId={destinationLocationId}
                   destinationLocationName={destinationLocationName}
                   isManualEntry={isManualEntry}
-                  onBack={() => setStep(1)}
+                  onBack={backToHeaderForm}
                   onNext={() => setStep(3)}
                 />
               )}
@@ -263,6 +326,7 @@ function ModalContents({
                   projectName={projectName}
                   notes={notes}
                   items={items}
+                  packingListFile={packingListFile}
                   onBack={() => setStep(2)}
                   onConfirmed={onConfirmed}
                 />
@@ -273,5 +337,70 @@ function ModalContents({
       </motion.div>
       </div>
     </motion.div>
+  )
+}
+
+// ── No-PO choice screen ─────────────────────────────────────────────────────
+
+function PoChoice({
+  onCreate,
+  onSkip,
+  onBack,
+}: {
+  onCreate: () => void
+  onSkip: () => void
+  onBack: () => void
+}) {
+  return (
+    <div className="space-y-5">
+      <p className="text-sm text-[var(--ink-2)]">
+        This packing list isn't linked to a purchase order. Create one from the parsed
+        items so received quantities are tracked against it — or receive straight into
+        inventory without a PO.
+      </p>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <button
+          onClick={onCreate}
+          className="rounded-xl text-left p-5 transition-colors"
+          style={{ border: '1.5px solid var(--signal)', background: 'color-mix(in oklab, var(--signal) 6%, var(--panel))' }}
+        >
+          <div className="inline-flex p-2.5 rounded-lg border border-[var(--line)] bg-[var(--panel)] mb-3">
+            <Icon name="clipboard" className="w-5 h-5" style={{ color: 'var(--signal)' }} />
+          </div>
+          <div className="text-[var(--ink)]" style={{ fontFamily: 'var(--serif)', fontSize: 16, fontWeight: 500 }}>
+            Create a PO from this packing list
+          </div>
+          <div className="text-[var(--muted)] text-sm mt-1">
+            Recommended — verify vendor, project and lines, then track receipts against it.
+          </div>
+        </button>
+
+        <button
+          onClick={onSkip}
+          className="rounded-xl text-left p-5 transition-colors hover:bg-[var(--panel-2)]"
+          style={{ border: '1.5px solid var(--line-2)', background: 'color-mix(in oklab, var(--panel-2) 60%, transparent)' }}
+        >
+          <div className="inline-flex p-2.5 rounded-lg border border-[var(--line)] bg-[var(--panel)] mb-3">
+            <Icon name="box" className="w-5 h-5 text-[var(--ink-2)]" />
+          </div>
+          <div className="text-[var(--ink)]" style={{ fontFamily: 'var(--serif)', fontSize: 16, fontWeight: 500 }}>
+            Receive without a PO
+          </div>
+          <div className="text-[var(--muted)] text-sm mt-1">
+            Add the items straight to inventory. No purchase order is created.
+          </div>
+        </button>
+      </div>
+
+      <div className="flex justify-start pt-4 border-t border-[var(--line)]">
+        <button
+          onClick={onBack}
+          className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg border border-[var(--line)] text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--panel-2)]"
+        >
+          Back
+        </button>
+      </div>
+    </div>
   )
 }

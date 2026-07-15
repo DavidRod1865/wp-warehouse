@@ -24,6 +24,8 @@ export interface ReceivingEntry {
   raw_content: string | null
   file_url: string | null
   file_name: string | null
+  /** Phase 4+: path within the private `packing-lists` bucket (view via signed URL) */
+  packing_list_storage_path: string | null
   parsed_content: Record<string, unknown> | null
   vendor_id: number | null
   project_id: number | null
@@ -159,6 +161,8 @@ export interface ConfirmReceiptParams {
   project_id: number | null
   notes: string | null
   items: ReceivingLineItem[]
+  /** Phase 4+: original packing-list PDF to archive (optional) */
+  packing_list_file?: File | null
 }
 
 /** Single item payload for the confirm_receipt RPC */
