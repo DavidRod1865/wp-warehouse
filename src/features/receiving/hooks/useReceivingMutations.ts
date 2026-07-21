@@ -33,6 +33,36 @@ interface ConfirmResult {
   poStatus: string | null
 }
 
+/**
+ * Upload a packing-list PDF to the private `packing-lists` bucket.
+ * Returns the storage path (view later via getPackingListFileUrl).
+ * Mirrors uploadPoFile in usePoMutations.ts.
+ */
+export async function uploadPackingListFile(
+  file: File,
+  keyHint: string,
+): Promise<string> {
+  const timestamp = Date.now()
+  const path = `${keyHint}/${timestamp}-${file.name}`
+
+  const { error } = await supabase.storage
+    .from('packing-lists')
+    .upload(path, file, { upsert: false })
+
+  if (error) throw error
+  return path
+}
+
+/** Get a short-lived signed URL for an archived packing list. */
+export async function getPackingListFileUrl(path: string): Promise<string> {
+  const { data, error } = await supabase.storage
+    .from('packing-lists')
+    .createSignedUrl(path, 3600) // 1 hour expiry
+
+  if (error) throw error
+  return data.signedUrl
+}
+
 /** Build the RPC payload item from a UI line item */
 function buildItemPayload(
   item: ReceivingLineItem,
@@ -73,6 +103,7 @@ export function useConfirmReceipt(onProgress?: (message: string) => void) {
         project_id,
         notes,
         items,
+        packing_list_file,
       } = params
 
       // Only process items that are not skipped and have an action
@@ -111,6 +142,25 @@ export function useConfirmReceipt(onProgress?: (message: string) => void) {
         log = newLog
       }
 
+      // Step 1b: Archive the packing-list PDF (if one was provided) before we
+      // create the entry, so its storage path can be persisted on the row.
+      let packingListPath: string | null = null
+      let packingListName: string | null = null
+      if (packing_list_file) {
+        onProgress?.('Archiving packing list...')
+        // Key by date + vendor so the bucket stays browsable.
+        const vendorSlug = (vendor || 'unknown')
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '')
+          .slice(0, 40) || 'unknown'
+        packingListPath = await uploadPackingListFile(
+          packing_list_file,
+          `${date_received}/${vendorSlug}`,
+        )
+        packingListName = packing_list_file.name
+      }
+
       // Step 2: Insert receiving_log_entry as draft (RPC will confirm it)
       const { data: entry, error: entryErr } = await supabase
         .from('receiving_log_entries')
@@ -127,6 +177,8 @@ export function useConfirmReceipt(onProgress?: (message: string) => void) {
           destination_type,
           destination_location_id,
           date_received,
+          packing_list_storage_path: packingListPath,
+          file_name: packingListName,
           parsed_content: {
             items_count: items.length,
             active_items: activeItems.length,

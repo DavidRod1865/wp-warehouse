@@ -9,7 +9,8 @@
  */
 import { useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { useDailyReceivingLog, useDatesWithEntries } from '../hooks/useDailyReceivingLog'
+import { useDailyReceivingLog } from '../hooks/useDailyReceivingLog'
+import { getPackingListFileUrl } from '../hooks/useReceivingMutations'
 import { useLocations } from '../../inventory/hooks/useLocations'
 import { Icon } from '../../../components/ui/Icon'
 import { generateReceivingLogPDF } from '../utils/generateReceivingLogPDF'
@@ -35,7 +36,6 @@ export function DailyReceivingLog() {
   const [date, setDate] = useState<string>(TODAY())
 
   const { data: log, isLoading } = useDailyReceivingLog(date)
-  const { data: datesWithEntries = [] } = useDatesWithEntries()
 
   // Load all locations so we can look up location names for Phase 4+ rows
   const { data: allLocations = [] } = useLocations()
@@ -119,7 +119,16 @@ export function DailyReceivingLog() {
         </div>
 
         <div className="flex items-center gap-2">
-          <DateNavigator date={date} datesWithEntries={datesWithEntries} onChange={setDate} />
+          {!isToday && (
+            <button
+              onClick={() => setDate(TODAY())}
+              className="px-3 py-2 rounded-lg border border-[var(--line)] bg-[var(--panel)] text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--panel-2)] transition-colors"
+              title="Jump back to today"
+            >
+              Today
+            </button>
+          )}
+          <DateNavigator date={date} onChange={setDate} />
           <button
             onClick={handlePrint}
             disabled={stats.entryCount === 0}
@@ -183,25 +192,16 @@ export function DailyReceivingLog() {
 
 function DateNavigator({
   date,
-  datesWithEntries,
   onChange,
 }: {
   date: string
-  datesWithEntries: string[]
   onChange: (d: string) => void
 }) {
-  const sorted = useMemo(() => [...datesWithEntries].sort(), [datesWithEntries])
-  const prevWithEntries = useMemo(
-    () => [...sorted].reverse().find((d) => d < date),
-    [sorted, date]
-  )
-  const nextWithEntries = useMemo(() => sorted.find((d) => d > date), [sorted, date])
-
   return (
     <div className="flex items-center rounded-lg border border-[var(--line)] bg-[var(--panel)] overflow-hidden">
       <button
-        onClick={() => onChange(prevWithEntries ?? shiftDate(date, -1))}
-        title={prevWithEntries ? `Previous day with entries: ${prevWithEntries}` : 'Previous day'}
+        onClick={() => onChange(shiftDate(date, -1))}
+        title="Previous day"
         className="px-2.5 py-2 text-[var(--muted)] hover:text-[var(--ink)] hover:bg-[var(--panel-2)] transition-colors"
       >
         <Icon name="chevron-left" className="w-3.5 h-3.5" />
@@ -214,8 +214,8 @@ function DateNavigator({
         style={{ fontFamily: 'var(--mono)', fontSize: 12 }}
       />
       <button
-        onClick={() => onChange(nextWithEntries ?? shiftDate(date, 1))}
-        title={nextWithEntries ? `Next day with entries: ${nextWithEntries}` : 'Next day'}
+        onClick={() => onChange(shiftDate(date, 1))}
+        title="Next day"
         className="px-2.5 py-2 text-[var(--muted)] hover:text-[var(--ink)] hover:bg-[var(--panel-2)] transition-colors"
       >
         <Icon name="chevron-right" className="w-3.5 h-3.5" />
@@ -402,7 +402,9 @@ function ExpandedItems({
   entry: ReceivingEntryWithItems
   locationNameMap: Map<number, string>
 }) {
-  if (entry.items.length === 0) {
+  const hasPackingList = !!entry.packing_list_storage_path
+
+  if (entry.items.length === 0 && !hasPackingList) {
     return (
       <div className="py-3 text-sm text-[var(--muted)]">
         No line items recorded for this receipt.
@@ -412,6 +414,19 @@ function ExpandedItems({
 
   return (
     <div className="py-3 pb-4">
+      {hasPackingList && (
+        <div className="mb-3">
+          <PackingListLink
+            path={entry.packing_list_storage_path!}
+            fileName={entry.file_name}
+          />
+        </div>
+      )}
+      {entry.items.length === 0 ? (
+        <div className="text-sm text-[var(--muted)]">
+          No line items recorded for this receipt.
+        </div>
+      ) : (
       <table className="w-full text-xs">
         <thead>
           <tr
@@ -431,7 +446,44 @@ function ExpandedItems({
           ))}
         </tbody>
       </table>
+      )}
     </div>
+  )
+}
+
+// ── Packing-list link ───────────────────────────────────────────────────────
+
+function PackingListLink({ path, fileName }: { path: string; fileName: string | null }) {
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(false)
+
+  const open = async () => {
+    setLoading(true)
+    setError(false)
+    try {
+      const url = await getPackingListFileUrl(path)
+      window.open(url, '_blank', 'noopener,noreferrer')
+    } catch {
+      setError(true)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <button
+      onClick={open}
+      disabled={loading}
+      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium text-[var(--signal)] hover:bg-[var(--panel)] transition-colors disabled:opacity-50"
+      style={{ border: '1px solid var(--line)' }}
+    >
+      {loading ? (
+        <span className="loading loading-spinner loading-xs" />
+      ) : (
+        <Icon name="file" className="w-3.5 h-3.5" />
+      )}
+      {error ? 'Could not open packing list' : `Packing list${fileName ? ` · ${fileName}` : ''}`}
+    </button>
   )
 }
 

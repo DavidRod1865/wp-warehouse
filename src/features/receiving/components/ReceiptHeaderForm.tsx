@@ -3,14 +3,15 @@
  *
  * Collects:
  *  - Vendor (selector from vendors table, with free-text fallback for PO-less)
- *  - Link to Purchase Order (confirmed/partially_received, filtered by project)
+ *  - Link to Purchase Order (search confirmed/partially_received POs)
  *  - Date received
  *  - Destination: a LOCATION selector (warehouse areas + project job_site)
  *  - PDF upload or manual entry
  */
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../../lib/supabase'
+import { Icon } from '../../../components/ui/Icon'
 import { useLocations } from '../../inventory/hooks/useLocations'
 import { PdfDropZone } from './PdfDropZone'
 import { useParsePdf } from '../hooks/useParsePdf'
@@ -46,22 +47,36 @@ interface POOption {
   vendor_id: number
   project_id: number
   vendor?: { name: string }
-  project?: { name: string }
+  project?: {
+    name: string
+    general_contractors?: { company_name: string } | null
+  }
 }
 
-function usePOOptions(projectId: number | null) {
+function projectLabel(project: POOption['project']): string {
+  if (!project) return ''
+  const gc = project.general_contractors?.company_name
+  return gc ? `${gc} - ${project.name}` : project.name
+}
+
+function poOptionLabel(po: POOption): string {
+  const project = projectLabel(po.project)
+  return [
+    po.po_number,
+    po.vendor?.name,
+    project || null,
+  ].filter(Boolean).join(' — ')
+}
+
+function usePOOptions() {
   return useQuery({
-    queryKey: ['form', 'po-options', projectId],
+    queryKey: ['form', 'po-options'],
     queryFn: async () => {
-      let q = supabase
+      const { data, error } = await supabase
         .from('purchase_orders')
-        .select('id, po_number, vendor_id, project_id, vendor:vendors(name), project:projects(name)')
+        .select('id, po_number, vendor_id, project_id, vendor:vendors(name), project:projects(name, general_contractors(company_name))')
         .in('status', ['confirmed', 'partially_received'])
         .order('po_number')
-      if (projectId) {
-        q = q.eq('project_id', projectId)
-      }
-      const { data, error } = await q
       if (error) throw error
       return (data || []) as unknown as POOption[]
     },
@@ -108,9 +123,14 @@ interface ReceiptHeaderFormProps {
   setDestinationLocationName: (v: string | null) => void
   notes: string
   setNotes: (v: string) => void
+  packingListFile: File | null
+  setPackingListFile: (f: File | null) => void
   onItemsParsed: (items: ReceivingLineItem[]) => void
   onManualEntry: () => void
-  onNext: () => void
+  /** `source` distinguishes a parsed packing list from manual entry so the
+   *  modal can offer the "create PO from packing list" branch only when there
+   *  are parsed items to seed it. */
+  onNext: (source: 'parsed' | 'manual') => void
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -135,29 +155,30 @@ export function ReceiptHeaderForm({
   setDestinationLocationName,
   notes,
   setNotes,
+  packingListFile,
+  setPackingListFile,
   onItemsParsed,
   onManualEntry,
   onNext,
 }: ReceiptHeaderFormProps) {
   const [vendorMode, setVendorMode] = useState<'select' | 'freetext'>('select')
+  const manualFileRef = useRef<HTMLInputElement>(null)
 
   const { data: vendors = [], isLoading: vendorsLoading } = useVendorOptions()
   const { data: projects = [], isLoading: projectsLoading } = useProjects()
-  const { data: poOptions = [], isLoading: posLoading } = usePOOptions(selectedProjectId)
+  const { data: poOptions = [], isLoading: posLoading } = usePOOptions()
   const { data: warehouseLocations = [], isLoading: locationsLoading } = useLocations({ type: 'warehouse_area' })
   const { data: jobSiteLocations = [] } = useLocations({ type: 'job_site' })
 
   const pdfHook = useParsePdf()
 
   // When a PO is selected, pre-fill vendor + project
-  const handlePoChange = (poIdStr: string) => {
-    if (!poIdStr) {
+  const handlePoSelect = (po: POOption | null) => {
+    if (!po) {
       setPoId(null)
       setPoNumber('')
       return
     }
-    const po = poOptions.find((p) => String(p.id) === poIdStr)
-    if (!po) return
     setPoId(po.id)
     setPoNumber(po.po_number)
     // Pre-fill vendor
@@ -228,12 +249,12 @@ export function ReceiptHeaderForm({
       notes: null,
     }))
     onItemsParsed(lineItems)
-    onNext()
+    onNext('parsed')
   }
 
   const handleManualEntry = () => {
     onManualEntry()
-    onNext()
+    onNext('manual')
   }
 
   const canProceed = vendor.trim() && dateReceived && destinationLocationId
@@ -246,24 +267,15 @@ export function ReceiptHeaderForm({
   return (
     <div className="space-y-5">
       {/* Row 1: PO Link */}
-      <FormField label="Link to Purchase Order">
+      <FormField label="Link to Existing Purchase Order">
         {posLoading ? (
           <span className="loading loading-spinner loading-sm" />
         ) : (
-          <select
-            className="form-input"
-            value={poId ?? ''}
-            onChange={(e) => handlePoChange(e.target.value)}
-          >
-            <option value="">No PO — miscellaneous stock</option>
-            {poOptions.map((po) => (
-              <option key={po.id} value={po.id}>
-                {po.po_number}
-                {po.vendor?.name ? ` — ${po.vendor.name}` : ''}
-                {po.project?.name ? ` — ${po.project.name}` : ''}
-              </option>
-            ))}
-          </select>
+          <PoSearchSelect
+            options={poOptions}
+            value={poId}
+            onChange={handlePoSelect}
+          />
         )}
         {poId && (
           <p className="text-xs text-[var(--muted)] mt-1">
@@ -419,6 +431,7 @@ export function ReceiptHeaderForm({
               isParsing={pdfHook.isParsing}
               error={pdfHook.error}
               onParse={(file) => pdfHook.parsePdf(file, vendor, poNumber)}
+              onFileSelected={setPackingListFile}
             />
             <button
               onClick={handleManualEntry}
@@ -453,6 +466,170 @@ export function ReceiptHeaderForm({
               </div>
             </button>
           </div>
+
+          {/* Optional packing-list attachment — kept on file with this receipt.
+              The PDF dropzone captures its own file automatically; this control
+              lets the manual-entry path (or a corrected upload) attach a copy. */}
+          <div className="mt-3 flex items-center gap-2 text-sm">
+            <input
+              ref={manualFileRef}
+              type="file"
+              accept=".pdf,application/pdf"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0]
+                if (f) setPackingListFile(f)
+              }}
+            />
+            {packingListFile ? (
+              <>
+                <Icon name="file" className="w-3.5 h-3.5 text-[var(--muted)] shrink-0" />
+                <span className="text-[var(--ink-2)] truncate">{packingListFile.name}</span>
+                <span className="text-[var(--muted)] text-xs">will be filed with this receipt</span>
+                <button
+                  type="button"
+                  onClick={() => setPackingListFile(null)}
+                  className="ml-1 text-[var(--muted)] hover:text-[var(--danger)] shrink-0"
+                  title="Remove attachment"
+                >
+                  <Icon name="close" className="w-3.5 h-3.5" />
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => manualFileRef.current?.click()}
+                className="inline-flex items-center gap-1.5 text-[var(--muted)] hover:text-[var(--signal)]"
+              >
+                <Icon name="file" className="w-3.5 h-3.5" />
+                Attach packing list PDF (optional)
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── PO search select ──
+
+function PoSearchSelect({
+  options,
+  value,
+  onChange,
+}: {
+  options: POOption[]
+  value: number | null
+  onChange: (po: POOption | null) => void
+}) {
+  const selected = options.find((po) => po.id === value) ?? null
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const rootRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const onPointerDown = (e: MouseEvent) => {
+      if (!rootRef.current?.contains(e.target as Node)) {
+        setOpen(false)
+        setQuery('')
+      }
+    }
+    document.addEventListener('mousedown', onPointerDown)
+    return () => document.removeEventListener('mousedown', onPointerDown)
+  }, [open])
+
+  const q = query.trim().toLowerCase()
+  const filtered = q
+    ? options.filter((po) => {
+        const haystack = [
+          po.po_number,
+          po.vendor?.name,
+          po.project?.name,
+          po.project?.general_contractors?.company_name,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+        return haystack.includes(q)
+      })
+    : options
+
+  const displayValue = open
+    ? query
+    : selected
+      ? poOptionLabel(selected)
+      : ''
+
+  return (
+    <div ref={rootRef} className="relative">
+      <div className="form-input flex items-center gap-2 !py-0 !px-0 overflow-hidden">
+        <Icon
+          name="search"
+          className="ml-3 h-4 w-4 shrink-0 text-[var(--muted)]"
+        />
+        <input
+          ref={inputRef}
+          className="min-w-0 flex-1 bg-transparent py-2.5 pr-2 text-[13.5px] text-[var(--ink)] outline-none placeholder:text-[var(--faint)]"
+          placeholder={selected ? undefined : 'Search PO #, vendor, or project…'}
+          value={displayValue}
+          onChange={(e) => {
+            setQuery(e.target.value)
+            if (!open) setOpen(true)
+          }}
+          onFocus={() => {
+            setOpen(true)
+            setQuery('')
+          }}
+          aria-expanded={open}
+          aria-autocomplete="list"
+          role="combobox"
+        />
+        {(selected || query) && (
+          <button
+            type="button"
+            className="mr-2 rounded p-1 text-[var(--muted)] hover:text-[var(--ink)]"
+            title={selected ? 'Clear PO link' : 'Clear search'}
+            onClick={() => {
+              onChange(null)
+              setQuery('')
+              setOpen(false)
+              inputRef.current?.blur()
+            }}
+          >
+            <Icon name="close" className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+
+      {open && (
+        <div className="absolute z-50 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-[var(--line)] bg-[var(--panel)] shadow-lg">
+          {filtered.length === 0 ? (
+            <div className="px-3 py-2.5 text-sm text-[var(--muted)]">No matching purchase orders</div>
+          ) : (
+            filtered.map((po) => {
+              const label = poOptionLabel(po)
+              const isSelected = po.id === value
+              return (
+                <button
+                  key={po.id}
+                  type="button"
+                  className={`w-full px-3 py-2.5 text-left text-sm hover:bg-[var(--panel-2)] ${
+                    isSelected ? 'bg-[var(--panel-2)] text-[var(--ink)]' : 'text-[var(--ink)]'
+                  }`}
+                  onClick={() => {
+                    onChange(po)
+                    setQuery('')
+                    setOpen(false)
+                  }}
+                >
+                  {label}
+                </button>
+              )
+            })
+          )}
         </div>
       )}
     </div>

@@ -16,25 +16,13 @@ import { Icon } from '../../../components/ui/Icon'
 export default function ReceivingPage() {
   const [modalOpen, setModalOpen] = useState(false)
 
-  const todayLong = new Date().toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'short',
-    day: 'numeric',
-  })
-
   return (
     <div className="p-6 max-w-[1400px]">
       {/* Hero — the daily log is now the page's identity */}
       <div className="flex items-start justify-between gap-4 mb-6">
         <div>
-          <div
-            className="text-[var(--muted)] uppercase"
-            style={{ fontFamily: 'var(--mono)', fontSize: 11, letterSpacing: '.06em' }}
-          >
-            Receiving log &middot; {todayLong}
-          </div>
           <h1
-            className="text-[var(--ink)] mt-1"
+            className="text-[var(--ink)]"
             style={{ fontFamily: 'var(--serif)', fontSize: 32, fontWeight: 500, letterSpacing: '-0.5px' }}
           >
             Daily receiving log

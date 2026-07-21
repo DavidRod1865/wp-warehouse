@@ -13,15 +13,18 @@ interface PdfDropZoneProps {
   isParsing: boolean
   error: string | null
   onParse: (file: File) => Promise<ParsedPackingItem[]>
+  /** Reports the raw File so it can be archived (kept on file). */
+  onFileSelected?: (file: File) => void
 }
 
-export function PdfDropZone({ onItemsParsed, isParsing, error, onParse }: PdfDropZoneProps) {
+export function PdfDropZone({ onItemsParsed, isParsing, error, onParse, onFileSelected }: PdfDropZoneProps) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [fileName, setFileName] = useState<string | null>(null)
 
   const handleFile = async (file: File) => {
     setFileName(file.name)
+    onFileSelected?.(file)
     try {
       const items = await onParse(file)
       onItemsParsed(items)
