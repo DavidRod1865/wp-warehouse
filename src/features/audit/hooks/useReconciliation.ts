@@ -33,7 +33,8 @@ export interface ReconciliationRow {
     | 'over_delivered'
 }
 
-async function fetchReconciliation(projectId?: number): Promise<ReconciliationRow[]> {
+/** Exported for testability. */
+export async function fetchReconciliation(projectId?: number): Promise<ReconciliationRow[]> {
   let query = supabase
     .from('po_project_reconciliation')
     .select('*')
