@@ -29,8 +29,7 @@ const operationsNav: NavItem[] = [
 
 const directoryNav: NavItem[] = [
   { to: '/projects', label: 'Projects', icon: 'briefcase' },
-  { to: '/clients', label: 'Clients', icon: 'building' },
-  { to: '/vendors', label: 'Vendors', icon: 'shopping-cart' },
+  { to: '/directory', label: 'Directory', icon: 'building' },
 ]
 
 const fieldNav: NavItem[] = [

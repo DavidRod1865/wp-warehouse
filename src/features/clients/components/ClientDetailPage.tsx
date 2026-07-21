@@ -37,7 +37,7 @@ export default function ClientDetailPage() {
     return (
       <div className="p-6 max-w-[1200px] mx-auto">
         <button
-          onClick={() => navigate('/clients')}
+          onClick={() => navigate('/directory?tab=clients')}
           className="inline-flex items-center gap-2 text-[var(--signal)] hover:underline mb-6"
         >
           <Icon name="arrow-left" className="w-4 h-4" />
@@ -54,7 +54,7 @@ export default function ClientDetailPage() {
     <div className="p-6 max-w-[1200px] mx-auto">
       {/* Back Button */}
       <button
-        onClick={() => navigate('/clients')}
+        onClick={() => navigate('/directory?tab=clients')}
         className="inline-flex items-center gap-2 text-[var(--signal)] hover:underline mb-6"
       >
         <Icon name="arrow-left" className="w-4 h-4" />

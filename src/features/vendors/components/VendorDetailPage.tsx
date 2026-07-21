@@ -143,7 +143,7 @@ export default function VendorDetailPage() {
     return (
       <div className="p-6 max-w-[1200px] mx-auto">
         <button
-          onClick={() => navigate('/vendors')}
+          onClick={() => navigate('/directory?tab=vendors')}
           className="inline-flex items-center gap-2 text-[var(--signal)] hover:underline mb-6"
         >
           <Icon name="arrow-left" className="w-4 h-4" />
@@ -163,7 +163,7 @@ export default function VendorDetailPage() {
   return (
     <div className="p-6 max-w-[1200px] mx-auto">
       <button
-        onClick={() => navigate('/vendors')}
+        onClick={() => navigate('/directory?tab=vendors')}
         className="inline-flex items-center gap-2 text-[var(--signal)] hover:underline mb-6"
       >
         <Icon name="arrow-left" className="w-4 h-4" />

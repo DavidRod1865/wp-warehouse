@@ -13,19 +13,21 @@ interface ModalState {
   vendor?: Vendor
 }
 
-export default function VendorsPage() {
+export default function VendorsPage({ embedded = false }: { embedded?: boolean }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [modal, setModal] = useState<ModalState>({ type: 'none' })
 
   const { data: vendors = [], isLoading } = useVendors({ search: searchQuery })
 
   return (
-    <div className="p-6 max-w-[1200px] mx-auto">
+    <div className={embedded ? '' : 'p-6 max-w-[1200px] mx-auto'}>
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-[var(--ink)]">Vendors</h1>
-        <p className="text-[var(--muted)] mt-1">Manage equipment and material suppliers</p>
-      </div>
+      {!embedded && (
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold text-[var(--ink)]">Vendors</h1>
+          <p className="text-[var(--muted)] mt-1">Manage equipment and material suppliers</p>
+        </div>
+      )}
 
       {/* Filter Bar */}
       <div className="mb-6 flex gap-3 items-end">
