@@ -36,6 +36,11 @@ to "Done" with a date when shipped. (Started 2026-07-21 during the app audit.)
 - [ ] Activity, Analytics/Reports, Batches, Packing-list archive pages (ComingSoon stubs).
 - [ ] Offline queueing for the driver PWA (explicitly deferred during rebuild).
 
+- [ ] Project hub discoverability — reaching per-project inventory requires knowing to
+  click Projects → project → Inventory tab. Consider: recently-viewed project shortcuts
+  in the sidebar, a project switcher in the topbar, or dashboard cards linking to hubs.
+- [ ] Replace the bare "." lazy-load Suspense fallback with a spinner/skeleton.
+
 ## Tech debt / hygiene
 - [ ] Deprecate `projects.job_site_location_id` once all reads use
   `locations.project_id` (kept for back-compat by `ensure_project_locations`).
