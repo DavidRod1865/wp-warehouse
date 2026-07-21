@@ -9,7 +9,9 @@
  *     /deliveries/new     — Create delivery
  *     /deliveries/:id     — Edit delivery
  *     /inventory          — Inventory browser
- *     /locations          — Location management (Warehouse, Trucks, Job Sites)
+ *     /locations          — Location management (Warehouse Areas, Trucks)
+ *     /projects/:id       — Project hub (inventory, POs, deliveries, reconciliation)
+ *     /directory          — Clients + Vendors directory (tabs; /clients and /vendors redirect here)
  *     /batches            — Batch management
  *     /packing-lists      — Packing list viewer
  *     /receiving          — Receiving log
@@ -44,11 +46,11 @@ const DeliveriesPage = lazy(() => import('../features/deliveries/components/Deli
 const InventoryPage = lazy(() => import('../features/inventory/components/InventoryPage'))
 const LocationsPage = lazy(() => import('../features/inventory/components/LocationsPage'))
 const ReceivingPage = lazy(() => import('../features/receiving/components/ReceivingPage'))
-const ClientsPage = lazy(() => import('../features/clients/components/ClientsPage'))
 const ClientDetailPage = lazy(() => import('../features/clients/components/ClientDetailPage'))
-const VendorsPage = lazy(() => import('../features/vendors/components/VendorsPage'))
 const VendorDetailPage = lazy(() => import('../features/vendors/components/VendorDetailPage'))
 const ProjectsPage = lazy(() => import('../features/projects/components/ProjectsPage'))
+const ProjectDetailPage = lazy(() => import('../features/projects/components/ProjectDetailPage'))
+const DirectoryPage = lazy(() => import('../features/directory/components/DirectoryPage'))
 const PurchaseOrdersPage = lazy(() => import('../features/purchase-orders/components/PurchaseOrdersPage'))
 const PoDetailPage = lazy(() => import('../features/purchase-orders/components/PoDetailPage'))
 const AuditPage = lazy(() => import('../features/audit/components/AuditPage'))
@@ -71,11 +73,13 @@ export const router = createBrowserRouter([
           { path: '/deliveries/:id', element: <EditDeliveryPage /> },
           { path: '/inventory', element: <InventoryPage /> },
           { path: '/locations', element: <LocationsPage /> },
-          { path: '/clients', element: <ClientsPage /> },
+          { path: '/directory', element: <DirectoryPage /> },
+          { path: '/clients', element: <Navigate to="/directory?tab=clients" replace /> },
           { path: '/clients/:id', element: <ClientDetailPage /> },
-          { path: '/vendors', element: <VendorsPage /> },
+          { path: '/vendors', element: <Navigate to="/directory?tab=vendors" replace /> },
           { path: '/vendors/:id', element: <VendorDetailPage /> },
           { path: '/projects', element: <ProjectsPage /> },
+          { path: '/projects/:id', element: <ProjectDetailPage /> },
           { path: '/purchase-orders', element: <PurchaseOrdersPage /> },
           { path: '/purchase-orders/:id', element: <PoDetailPage /> },
           { path: '/batches', element: <ComingSoon /> },

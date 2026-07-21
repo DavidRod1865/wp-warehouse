@@ -85,6 +85,34 @@ describe('useInventoryMutations', () => {
       })
     })
 
+    it('calls rpc("move_inventory") with movement_type "return" for overstock returns', async () => {
+      mockClient.current.rpc.mockResolvedValueOnce({ data: { success: true }, error: null })
+      const wrapper = createQueryWrapper()
+      const { result } = renderHook(() => useMoveInventory(), { wrapper })
+
+      await result.current.mutateAsync({
+        item_id: 3,
+        quantity: 4,
+        movement_type: 'return',
+        from_location_id: 30,
+        to_location_id: 40,
+        reference_type: 'overstock_return',
+        reference_id: 100,
+        notes: 'excess material',
+      })
+
+      expect(mockClient.current.rpc).toHaveBeenCalledWith('move_inventory', {
+        p_item_id: 3,
+        p_quantity: 4,
+        p_movement_type: 'return',
+        p_from_location_id: 30,
+        p_to_location_id: 40,
+        p_reference_type: 'overstock_return',
+        p_reference_id: 100,
+        p_notes: 'excess material',
+      })
+    })
+
     it('throws when the RPC returns an error', async () => {
       mockClient.current.rpc.mockResolvedValueOnce({
         data: null,

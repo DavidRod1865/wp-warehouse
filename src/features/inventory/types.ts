@@ -5,8 +5,9 @@
 export interface Location {
   id: number
   name: string
-  location_type: 'warehouse_area' | 'truck' | 'job_site'
+  location_type: 'warehouse_area' | 'truck' | 'job_site' | 'rigging_yard'
   parent_location_id: number | null
+  project_id: number | null
   address: Record<string, string> | null
   is_active: boolean
   created_at: string
@@ -36,7 +37,7 @@ export interface StockLevel {
 
 export interface InventoryMovement {
   id: number
-  movement_type: 'receive' | 'transfer' | 'load_truck' | 'deliver' | 'adjust'
+  movement_type: 'receive' | 'transfer' | 'load_truck' | 'deliver' | 'adjust' | 'return'
   from_location_id: number | null
   to_location_id: number | null
   item_id: number

@@ -25,9 +25,11 @@ export const inventoryKeys = {
   stockByLocation: (locationId: number) => ['inventory', 'stock_levels', 'location', locationId] as const,
   stockByItem: (itemId: number) => ['inventory', 'stock_levels', 'item', itemId] as const,
   allStockByItem: () => ['inventory', 'stock_levels', 'all_by_item'] as const,
+  stockByProject: (projectId: number) => ['inventory', 'stock_levels', 'project', projectId] as const,
 
   // Movements
   movements: () => ['inventory', 'movements'] as const,
   movementsByItem: (itemId: number) => ['inventory', 'movements', 'item', itemId] as const,
   movementsByReference: (refType: string, refId: number) => ['inventory', 'movements', 'ref', refType, refId] as const,
+  returnsByProject: (projectId: number) => ['inventory', 'movements', 'returns', 'project', projectId] as const,
 }

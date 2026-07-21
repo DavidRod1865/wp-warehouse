@@ -5,6 +5,7 @@
  * Shows links to general contractor and project address.
  */
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useProjects } from '../hooks/useProjects'
 import { Icon } from '../../../components/ui/Icon'
 import { ProjectFormModal } from './ProjectFormModal'
@@ -213,16 +214,18 @@ function ProjectCard({
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
           <h3 className="font-semibold text-[var(--ink)] tracking-tight">
-            {isGrid && project.general_contractor ? (
-              <>
-                <span className="block">{project.general_contractor}</span>
-                <span className="block">{project.name}</span>
-              </>
-            ) : project.general_contractor ? (
-              `${project.general_contractor} - ${project.name}`
-            ) : (
-              project.name
-            )}
+            <Link to={`/projects/${project.id}`} className="hover:underline">
+              {isGrid && project.general_contractor ? (
+                <>
+                  <span className="block">{project.general_contractor}</span>
+                  <span className="block">{project.name}</span>
+                </>
+              ) : project.general_contractor ? (
+                `${project.general_contractor} - ${project.name}`
+              ) : (
+                project.name
+              )}
+            </Link>
           </h3>
           {project.project_address && (
             <div className="mt-1 text-sm text-[var(--muted)]">

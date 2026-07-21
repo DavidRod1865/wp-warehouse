@@ -1,19 +1,21 @@
 /**
- * LocationsPage — Manage warehouse and truck locations
+ * LocationsPage — Manage shared warehouse areas and trucks
  *
- * Job sites are NOT created here: every project's address IS its job site,
- * so job_site locations are created/updated automatically with the project
- * (src/features/projects/hooks/useProjectMutations.ts) and shown read-only.
+ * Project-scoped locations (job_site, rigging_yard, and a project's own
+ * warehouse staging area) are NOT managed here — they're created/synced
+ * automatically per project via the `ensure_project_locations` RPC
+ * (src/features/projects/hooks/useProjectMutations.ts) and are managed from
+ * each project's hub (ProjectDetailPage). This page only lists shared
+ * locations (project_id IS NULL).
  */
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
 import { useLocations } from '../hooks/useLocations'
 import { useCreateLocation, useUpdateLocation } from '../hooks/useInventoryMutations'
 import { Icon } from '../../../components/ui/Icon'
 import { useToast } from '../../../components/ui/Toast'
 import type { Location } from '../types'
 
-type LocationType = 'warehouse_area' | 'truck' | 'job_site'
+type LocationType = 'warehouse_area' | 'truck'
 
 interface ModalState {
   type: 'none' | 'create' | 'edit'
@@ -25,11 +27,11 @@ export default function LocationsPage() {
   const [modal, setModal] = useState<ModalState>({ type: 'none' })
   const [activeTab, setActiveTab] = useState<LocationType>('warehouse_area')
 
-  // Group by type
+  // Group by type — Warehouse Areas here means shared areas only
+  // (project_id IS NULL); per-project staging areas live on the project hub.
   const byType = {
-    warehouse_area: locations.filter((l) => l.location_type === 'warehouse_area'),
+    warehouse_area: locations.filter((l) => l.location_type === 'warehouse_area' && l.project_id == null),
     truck: locations.filter((l) => l.location_type === 'truck'),
-    job_site: locations.filter((l) => l.location_type === 'job_site'),
   }
 
   const currentLocations = byType[activeTab]
@@ -37,7 +39,6 @@ export default function LocationsPage() {
   const typeLabels: Record<LocationType, string> = {
     warehouse_area: 'Warehouse Areas',
     truck: 'Trucks',
-    job_site: 'Job Sites',
   }
 
   return (
@@ -45,12 +46,12 @@ export default function LocationsPage() {
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-[var(--ink)]">Locations</h1>
-        <p className="text-[var(--muted)] mt-1">Manage warehouses, trucks, and job sites</p>
+        <p className="text-[var(--muted)] mt-1">Manage shared warehouse areas and trucks</p>
       </div>
 
       {/* Tabs */}
       <div className="mb-6 flex gap-1 border-b border-[var(--line)]">
-        {(['warehouse_area', 'truck', 'job_site'] as LocationType[]).map((type) => (
+        {(['warehouse_area', 'truck'] as LocationType[]).map((type) => (
           <button
             key={type}
             onClick={() => setActiveTab(type)}
@@ -68,23 +69,16 @@ export default function LocationsPage() {
         ))}
       </div>
 
-      {/* Actions — job sites are derived from projects, not created here */}
+      {/* Actions */}
       <div className="mb-6 flex gap-2 items-center">
-        {activeTab === 'job_site' ? (
-          <p className="text-sm text-[var(--muted)]">
-            Job sites are created automatically from a project's address. Manage them on the{' '}
-            <Link to="/projects" className="text-[var(--signal)] hover:underline">Projects</Link> page.
-          </p>
-        ) : (
-          <button
-            onClick={() => setModal({ type: 'create' })}
-            className="px-4 py-2 rounded-lg text-[var(--on-signal)] text-sm font-medium hover:opacity-90"
-            style={{ background: 'var(--signal)' }}
-          >
-            <Icon name="plus" className="w-4 h-4 inline mr-1" />
-            New {typeLabels[activeTab].slice(0, -1)}
-          </button>
-        )}
+        <button
+          onClick={() => setModal({ type: 'create' })}
+          className="px-4 py-2 rounded-lg text-[var(--on-signal)] text-sm font-medium hover:opacity-90"
+          style={{ background: 'var(--signal)' }}
+        >
+          <Icon name="plus" className="w-4 h-4 inline mr-1" />
+          New {typeLabels[activeTab].slice(0, -1)}
+        </button>
       </div>
 
       {/* Locations List */}
@@ -140,8 +134,7 @@ function LocationCard({
   const typeLabel = {
     warehouse_area: 'Warehouse Area',
     truck: 'Truck',
-    job_site: 'Job Site',
-  }[location.location_type]
+  }[location.location_type as 'warehouse_area' | 'truck']
 
   const parentLocation = location.parent_location_id
     ? allLocations.find((l) => l.id === location.parent_location_id)
@@ -176,14 +169,12 @@ function LocationCard({
             </div>
           )}
         </div>
-        {location.location_type !== 'job_site' && (
-          <button
-            onClick={onEdit}
-            className="p-2 rounded-lg text-[var(--muted)] hover:bg-[var(--panel-2)]"
-          >
-            <Icon name="edit" className="w-4 h-4" />
-          </button>
-        )}
+        <button
+          onClick={onEdit}
+          className="p-2 rounded-lg text-[var(--muted)] hover:bg-[var(--panel-2)]"
+        >
+          <Icon name="edit" className="w-4 h-4" />
+        </button>
       </div>
     </div>
   )
@@ -198,7 +189,11 @@ interface LocationFormModalProps {
 
 function LocationFormModal({ type, location, locations, onClose }: LocationFormModalProps) {
   const [name, setName] = useState(location?.name ?? '')
-  const [locationType, setLocationType] = useState<LocationType>(type ?? location?.location_type ?? 'warehouse_area')
+  // This modal only ever opens for warehouse_area/truck locations (the only
+  // types shown on this page), so the cast is safe.
+  const [locationType, setLocationType] = useState<LocationType>(
+    type ?? (location?.location_type as LocationType | undefined) ?? 'warehouse_area'
+  )
   const [parentId, setParentId] = useState<number | null>(location?.parent_location_id ?? null)
   const [isActive, setIsActive] = useState(location?.is_active ?? true)
   const [saving, setSaving] = useState(false)

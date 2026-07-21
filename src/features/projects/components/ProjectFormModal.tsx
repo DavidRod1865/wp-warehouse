@@ -157,7 +157,7 @@ export function ProjectFormModal({ project, onClose }: ProjectFormModalProps) {
                 ))}
               </select>
               <p className="mt-1 text-xs text-[var(--muted)]">
-                Don't see your contractor? <a href="/clients" className="text-[var(--signal)] hover:underline">Add one</a>
+                Don't see your contractor? <a href="/directory?tab=clients" className="text-[var(--signal)] hover:underline">Add one</a>
               </p>
             </FormField>
 

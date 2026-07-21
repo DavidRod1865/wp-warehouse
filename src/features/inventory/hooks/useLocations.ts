@@ -9,7 +9,7 @@ import { inventoryKeys } from './inventoryKeys'
 import type { Location } from '../types'
 
 interface UseLocationsOptions {
-  type?: 'warehouse_area' | 'truck' | 'job_site'
+  type?: 'warehouse_area' | 'truck' | 'job_site' | 'rigging_yard'
   activeOnly?: boolean
 }
 

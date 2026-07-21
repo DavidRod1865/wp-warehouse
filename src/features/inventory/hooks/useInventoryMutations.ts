@@ -74,8 +74,9 @@ export function useUpdateItem() {
 
 export interface CreateLocationInput {
   name: string
-  location_type: 'warehouse_area' | 'truck' | 'job_site'
+  location_type: 'warehouse_area' | 'truck' | 'job_site' | 'rigging_yard'
   parent_location_id?: number | null
+  project_id?: number | null
   address?: Record<string, string> | null
   is_active?: boolean
 }
@@ -135,7 +136,7 @@ export function useUpdateLocation() {
 export interface MoveInventoryInput {
   item_id: number
   quantity: number
-  movement_type: 'receive' | 'transfer' | 'load_truck' | 'deliver' | 'adjust'
+  movement_type: 'receive' | 'transfer' | 'load_truck' | 'deliver' | 'adjust' | 'return'
   from_location_id?: number | null
   to_location_id?: number | null
   reference_type?: string | null

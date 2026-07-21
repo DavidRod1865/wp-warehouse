@@ -1,23 +1,38 @@
 /**
  * useProjectMutations — Mutations for creating and updating projects
  *
- * Note on createProject: When creating a project, we also create a job_site location.
- * Currently done as two client-side inserts (insert project, then insert location and
- * update project with job_site_location_id). This pattern is acceptable for now but
- * should move to an RPC if it becomes problematic (transaction atomicity, etc).
+ * Project locations (job_site, rigging_yard, project warehouse staging) are
+ * NOT managed client-side. Every create/update calls the SECURITY DEFINER
+ * RPC `ensure_project_locations`, which idempotently finds-or-creates the
+ * three locations and keeps the job_site name/address synced to the project
+ * (the project's address IS its job site). This also fixes a bug where a
+ * status-only edit used to skip location sync entirely.
  */
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../../lib/supabase'
 import { projectKeys } from './projectKeys'
+import { inventoryKeys } from '../../inventory/hooks/inventoryKeys'
 import type { Project } from '../../../types/project'
 import type { ProjectFormValues } from '../schemas/projectSchema'
+
+async function ensureProjectLocations(projectId: number) {
+  const { data, error } = await supabase.rpc('ensure_project_locations', {
+    p_project_id: projectId,
+  })
+
+  if (error) throw error
+  if (!data?.success) {
+    throw new Error('Failed to sync project locations')
+  }
+
+  return data
+}
 
 export function useCreateProject() {
   const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: async (values: ProjectFormValues) => {
-      // Step 1: Create the project
       const { data: projectData, error: projectError } = await supabase
         .from('projects')
         .insert([
@@ -34,41 +49,13 @@ export function useCreateProject() {
 
       if (projectError) throw projectError
 
-      // Step 2: Create a job_site location with the project address
-      const { data: locationData, error: locationError } = await supabase
-        .from('locations')
-        .insert([
-          {
-            name: values.name,
-            location_type: 'job_site',
-            address: {
-              street: values.project_address.street_address,
-              city: values.project_address.city,
-              state: values.project_address.state,
-              zip: values.project_address.zip_code,
-              phone: values.project_address.phone,
-            },
-          },
-        ])
-        .select()
-        .single()
+      await ensureProjectLocations(projectData.id)
 
-      if (locationError) throw locationError
-
-      // Step 3: Update project with job_site_location_id
-      const { data: updatedProject, error: updateError } = await supabase
-        .from('projects')
-        .update({ job_site_location_id: locationData.id })
-        .eq('id', projectData.id)
-        .select()
-        .single()
-
-      if (updateError) throw updateError
-
-      return updatedProject as Project
+      return projectData as Project
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: projectKeys.all })
+      queryClient.invalidateQueries({ queryKey: inventoryKeys.locations() })
     },
   })
 }
@@ -102,51 +89,18 @@ export function useUpdateProject() {
         .single()
 
       if (error) throw error
-      const project = data as Project
 
-      // The project's address IS its job site — keep the derived job_site
-      // location in sync, creating it for legacy projects that predate the link
-      if (values.name !== undefined || values.project_address !== undefined) {
-        const locationFields = {
-          name: project.name,
-          address: project.project_address
-            ? {
-                street: project.project_address.street_address,
-                city: project.project_address.city,
-                state: project.project_address.state,
-                zip: project.project_address.zip_code,
-                phone: project.project_address.phone,
-              }
-            : null,
-        }
+      // Always resync — a status-only edit still needs its locations to
+      // exist (legacy projects), and name/address edits must propagate to
+      // the job_site location.
+      await ensureProjectLocations(id)
 
-        if (project.job_site_location_id) {
-          const { error: locError } = await supabase
-            .from('locations')
-            .update(locationFields)
-            .eq('id', project.job_site_location_id)
-          if (locError) throw locError
-        } else {
-          const { data: newLoc, error: locError } = await supabase
-            .from('locations')
-            .insert([{ ...locationFields, location_type: 'job_site' }])
-            .select()
-            .single()
-          if (locError) throw locError
-
-          const { error: linkError } = await supabase
-            .from('projects')
-            .update({ job_site_location_id: newLoc.id })
-            .eq('id', id)
-          if (linkError) throw linkError
-        }
-      }
-
-      return project
+      return data as Project
     },
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: projectKeys.all })
       queryClient.invalidateQueries({ queryKey: projectKeys.detail(id) })
+      queryClient.invalidateQueries({ queryKey: inventoryKeys.locations() })
     },
   })
 }

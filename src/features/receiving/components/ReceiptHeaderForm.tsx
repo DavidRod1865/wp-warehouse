@@ -18,6 +18,12 @@ import { useParsePdf } from '../hooks/useParsePdf'
 import type { Project } from '../../../types/project'
 import type { ParsedPackingItem, ReceivingLineItem } from '../types'
 
+const PROJECT_LOCATION_TYPE_LABEL: Record<string, string> = {
+  warehouse_area: 'Staging',
+  rigging_yard: 'Rigging Yard',
+  job_site: 'Job Site',
+}
+
 // ── Local query hooks ─────────────────────────────────────────────────────────
 
 interface VendorOption {
@@ -169,8 +175,17 @@ export function ReceiptHeaderForm({
   const { data: poOptions = [], isLoading: posLoading } = usePOOptions()
   const { data: warehouseLocations = [], isLoading: locationsLoading } = useLocations({ type: 'warehouse_area' })
   const { data: jobSiteLocations = [] } = useLocations({ type: 'job_site' })
+  const { data: riggingYardLocations = [] } = useLocations({ type: 'rigging_yard' })
 
   const pdfHook = useParsePdf()
+
+  // Default destination for a project: its own warehouse staging location,
+  // falling back to its job site if no staging location exists yet.
+  const defaultDestinationForProject = (projectId: number) => {
+    const staging = warehouseLocations.find((l) => l.project_id === projectId)
+    if (staging) return staging
+    return jobSiteLocations.find((l) => l.project_id === projectId) ?? null
+  }
 
   // When a PO is selected, pre-fill vendor + project
   const handlePoSelect = (po: POOption | null) => {
@@ -192,11 +207,23 @@ export function ReceiptHeaderForm({
     if (proj) {
       setSelectedProjectId(proj.id)
       setProjectName(proj.name)
-      // Try to pre-fill job site location for that project
-      const jobSite = jobSiteLocations.find((l) => l.name.toLowerCase().includes(proj.name.toLowerCase()))
-      if (jobSite) {
-        setDestinationLocationId(jobSite.id)
-        setDestinationLocationName(jobSite.name)
+      const dest = defaultDestinationForProject(proj.id)
+      if (dest) {
+        setDestinationLocationId(dest.id)
+        setDestinationLocationName(dest.name)
+      }
+    }
+  }
+
+  const handleProjectSelect = (pid: number | null) => {
+    const proj = pid ? projects.find((p) => p.id === pid) : undefined
+    setSelectedProjectId(pid)
+    setProjectName(proj?.name ?? null)
+    if (proj) {
+      const dest = defaultDestinationForProject(proj.id)
+      if (dest) {
+        setDestinationLocationId(dest.id)
+        setDestinationLocationName(dest.name)
       }
     }
   }
@@ -220,7 +247,7 @@ export function ReceiptHeaderForm({
       setDestinationLocationName(null)
       return
     }
-    const allLocations = [...warehouseLocations, ...jobSiteLocations]
+    const allLocations = [...warehouseLocations, ...jobSiteLocations, ...riggingYardLocations]
     const loc = allLocations.find((l) => String(l.id) === locationIdStr)
     if (loc) {
       setDestinationLocationId(loc.id)
@@ -259,9 +286,20 @@ export function ReceiptHeaderForm({
 
   const canProceed = vendor.trim() && dateReceived && destinationLocationId
 
+  // Shared warehouse areas (no project) vs. this project's own locations —
+  // per-project areas are labeled with their type so they're never confused
+  // with the shared pool.
+  const sharedWarehouseLocations = warehouseLocations.filter((l) => l.project_id == null)
+  const selectedProjectLocations = selectedProjectId
+    ? [...warehouseLocations, ...jobSiteLocations, ...riggingYardLocations].filter(
+        (l) => l.project_id === selectedProjectId
+      )
+    : []
+
   const allLocations = [
-    ...warehouseLocations.map((l) => ({ ...l, group: 'Warehouse Areas' })),
+    ...sharedWarehouseLocations.map((l) => ({ ...l, group: 'Warehouse Areas' })),
     ...jobSiteLocations.map((l) => ({ ...l, group: 'Job Sites' })),
+    ...selectedProjectLocations.map((l) => ({ ...l, group: 'Project' })),
   ]
 
   return (
@@ -361,12 +399,7 @@ export function ReceiptHeaderForm({
             <select
               className="form-input"
               value={selectedProjectId ?? ''}
-              onChange={(e) => {
-                const pid = e.target.value ? Number(e.target.value) : null
-                const proj = projects.find((p) => p.id === pid)
-                setSelectedProjectId(pid)
-                setProjectName(proj?.name ?? null)
-              }}
+              onChange={(e) => handleProjectSelect(e.target.value ? Number(e.target.value) : null)}
             >
               <option value="">No project (main warehouse)</option>
               {projects.map((p) => (
@@ -386,14 +419,23 @@ export function ReceiptHeaderForm({
               onChange={(e) => handleLocationChange(e.target.value)}
             >
               <option value="">Select destination...</option>
-              {warehouseLocations.length > 0 && (
-                <optgroup label="Warehouse Areas">
-                  {warehouseLocations.map((l) => (
+              {sharedWarehouseLocations.length > 0 && (
+                <optgroup label="Warehouse Areas (Shared)">
+                  {sharedWarehouseLocations.map((l) => (
                     <option key={l.id} value={l.id}>{l.name}</option>
                   ))}
                 </optgroup>
               )}
-              {jobSiteLocations.length > 0 && (
+              {selectedProjectLocations.length > 0 && (
+                <optgroup label={`Project: ${projects.find((p) => p.id === selectedProjectId)?.name ?? ''}`}>
+                  {selectedProjectLocations.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.name} ({PROJECT_LOCATION_TYPE_LABEL[l.location_type] ?? l.location_type})
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              {!selectedProjectId && jobSiteLocations.length > 0 && (
                 <optgroup label="Job Sites">
                   {jobSiteLocations.map((l) => (
                     <option key={l.id} value={l.id}>{l.name}</option>
