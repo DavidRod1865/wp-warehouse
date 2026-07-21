@@ -1,46 +1,75 @@
 # WP Warehouse — Project Site Map
 
-> Warehouse management system for With Pride HVAC.
-> React 19 + TypeScript + Vite + Tailwind/DaisyUI + Supabase + Sortly API
+> Warehouse & delivery management system for With Pride HVAC.
+> React 19 + TypeScript + Vite + Tailwind 4 + DaisyUI + TanStack Query — Supabase backend
+> (Postgres, Auth, Storage, Edge Functions). Inventory is first-party (Sortly removed 2026-07).
 
 ---
 
 ## Application Routes
 
-### Public Routes (No Auth Required)
+Defined in `src/app/routes.tsx`.
+
+### Public Routes
+
 | Route | Page Component | Purpose |
 |---|---|---|
-| `/login` | `Login.tsx` | Manager/admin email + password login |
-| `/driver/login` | `DriverLogin.tsx` | Driver username + password/PIN login |
-| `/forgot-password` | `ForgotPassword.tsx` | Password reset request form |
-| `/reset-password` | `ResetPassword.tsx` | Password reset confirmation (from email link) |
+| `/login` | `features/auth/components/LoginPage.tsx` | Manager/admin email + password login |
+| `/driver/login` | `features/auth/components/DriverLoginPage.tsx` | Driver username + password/PIN login |
 
 ### Manager Routes (Role: warehouse_manager, apm, admin)
-All nested inside `DashboardLayout` which provides sidebar nav + mobile bottom nav.
+
+Wrapped in `ManagerRoute` (auth guard) → `ManagerLayout` (`src/components/layout/ManagerLayout.tsx`).
 
 | Route | Page Component | Purpose |
 |---|---|---|
-| `/` | `Dashboard.tsx` | Main dashboard — delivery overview and stats |
-| `/deliveries` | `Dashboard.tsx` | Same as root (delivery list view) |
-| `/deliveries/create` | `DeliveryForm.tsx` | Create a new delivery order |
-| `/deliveries/:id` | `DeliveryDetail.tsx` | View delivery details, status, items |
-| `/deliveries/:id/edit` | `DeliveryForm.tsx` | Edit an existing delivery |
-| `/inventory` | `WarehouseInventory.tsx` | Browse Sortly inventory (folders/items) |
-| `/inventory/adjustments` | `InventoryAdjustments.tsx` | Record inventory adjustments (returns, damage, transfers) |
-| `/batches/create` | `CreateBatch.tsx` | Group multiple deliveries into a batch |
-| `/activity-log` | `ActivityLog.tsx` | Audit trail of all system actions |
-| `/vendors` | `Vendors.tsx` | Manage vendor contacts and addresses |
-| `/drivers` | `DriverManagement.tsx` | Create/edit/delete driver accounts |
-| `/drivers/metrics` | `DriverMetrics.tsx` | Driver performance analytics and charts |
-| `/settings` | `Settings.tsx` | User profile and app settings |
+| `/` | `deliveries/components/DashboardPage.tsx` | Delivery overview, stats, quick actions |
+| `/deliveries` | `deliveries/components/DeliveriesPage.tsx` | Full delivery list with filters |
+| `/deliveries/new` | `deliveries/components/CreateDeliveryPage.tsx` | Create a delivery |
+| `/deliveries/:id` | `deliveries/components/EditDeliveryPage.tsx` | Edit/view a delivery |
+| `/inventory` | `inventory/components/InventoryPage.tsx` | Item + stock-level browser |
+| `/locations` | `inventory/components/LocationsPage.tsx` | Manage warehouse areas, trucks, job sites |
+| `/clients` | `clients/components/ClientsPage.tsx` | General contractor directory |
+| `/clients/:id` | `clients/components/ClientDetailPage.tsx` | Client detail + associated projects |
+| `/vendors` | `vendors/components/VendorsPage.tsx` | Vendor directory |
+| `/vendors/:id` | `vendors/components/VendorDetailPage.tsx` | Vendor detail |
+| `/projects` | `projects/components/ProjectsPage.tsx` | Project (job) directory |
+| `/purchase-orders` | `purchase-orders/components/PurchaseOrdersPage.tsx` | PO list |
+| `/purchase-orders/:id` | `purchase-orders/components/PoDetailPage.tsx` | PO detail + line-item review |
+| `/receiving` | `receiving/components/ReceivingPage.tsx` | Daily receiving log, packing-list intake |
+| `/audit` | `audit/components/AuditPage.tsx` | Reconciliation, cycle counts, signed deliveries |
+| `/batches` | `components/shared/ComingSoon.tsx` | Placeholder — batching feature not yet built |
+| `/packing-lists` | `components/shared/ComingSoon.tsx` | Placeholder |
+| `/analytics` | `components/shared/ComingSoon.tsx` | Placeholder |
+| `/users` | `components/shared/ComingSoon.tsx` | Placeholder |
+| `/activity` | `components/shared/ComingSoon.tsx` | Placeholder |
+
+> Note: `src/features/{activity,analytics,batching,drivers,packing-lists,users}/` exist as
+> empty scaffold directories (components/hooks subfolders, no files) for these placeholder routes.
 
 ### Driver Routes (Role: driver)
-Protected by `DriverRoute` — redirects non-drivers away.
+
+Wrapped in `DriverRoute` (auth guard) → `DriverLayout` (`src/components/layout/DriverLayout.tsx`).
 
 | Route | Page Component | Purpose |
 |---|---|---|
-| `/driver/deliveries` | `DriverDeliveries.tsx` | List of deliveries assigned to this driver |
-| `/driver/deliveries/:id` | `DriverDeliveryDetail.tsx` | Delivery details with confirm/signature flow |
+| `/driver/deliveries` | `driver/components/DriverDeliveriesPage.tsx` | Deliveries assigned to this driver |
+| `/driver/deliveries/:id` | `driver/components/DriverDeliveryDetailPage.tsx` | Delivery detail, confirm + signature |
+| `/driver/settings` | `driver/components/DriverSettingsPage.tsx` | PIN/password settings |
+
+Catch-all: unmatched paths redirect to `/`.
+
+---
+
+## Layout Shell
+
+```
+src/components/layout/
+├── ManagerLayout.tsx   # Sidebar + sticky Topbar + <Outlet/> for manager routes
+├── Sidebar.tsx          # 248px nav: Operations / Directory / Field / Data sections, user footer
+├── Topbar.tsx           # Breadcrumbs (from URL segments), theme toggle
+└── DriverLayout.tsx     # Simplified top bar for the mobile-first driver PWA
+```
 
 ---
 
@@ -49,220 +78,86 @@ Protected by `DriverRoute` — redirects non-drivers away.
 ### Entry Points
 ```
 src/
-├── main.tsx                    # React DOM root — renders <App> in StrictMode
-├── App.tsx                     # Router setup, auth provider, route definitions
-├── index.css                   # Global Tailwind styles
-└── vite-env.d.ts               # Vite type declarations
+├── main.tsx             # React DOM root
+├── app/
+│   ├── App.tsx           # Providers (QueryClient, Auth, Toast) + <RouterProvider>
+│   └── routes.tsx        # All route definitions (see above)
+├── index.css             # Tailwind + design tokens
+└── vite-env.d.ts
 ```
 
-### Contexts (Global State)
-```
-src/contexts/
-└── AuthContext.tsx              # Auth state, user profile, Supabase realtime subscriptions
-                                 # Provides: user, profile, signIn, signOut, resetPassword
-                                 # Sets up realtime channels for deliveries, items, notifications, inventory
-```
-
-### Libraries (Client Instances)
+### Library Clients
 ```
 src/lib/
-├── supabase.ts                 # Two Supabase clients:
-│                                #   supabase — main client for auth sessions
-│                                #   supabaseDriverAuth — isolated client for creating driver accounts
-│                                #                        (persistSession: false to avoid hijacking admin session)
-│
-└── sortly.ts                   # Sortly API client — all calls route through sortly-proxy Edge Function
-                                 # Methods: listItems, getItem, createItem, updateItem, deleteItem,
-                                 #          copyItem (warehouse→truck), moveItem (truck→jobsite),
-                                 #          searchItems, addDeliveryNote, removeDeliveryNote
+├── supabase.ts       # Single Supabase client (see CLAUDE.md — no dual-client pattern anymore)
+└── queryClient.ts    # TanStack Query client instance
 ```
 
-### Hooks (Reusable Logic)
+### Feature Folders (`src/features/*`)
+
+Each feature generally follows `components/`, `hooks/`, `schemas/` (zod), `utils/`.
+
 ```
-src/hooks/
-├── useSessionTimeout.ts        # Auto sign-out after inactivity (role-based timeouts:
-│                                #   driver=8h, admin=2h, warehouse_manager/apm=4h)
-│
-└── useDeliveryFormData.ts      # Loads all data needed for delivery creation/editing:
-                                 # projects (from DB + auto-synced from Sortly), trucks, root folders, vendors
+auth/            LoginPage, DriverLoginPage, ManagerRoute/DriverRoute guards,
+                 useAuth (profile + session + realtime), useRequireRole, loginSchema
+
+deliveries/      DashboardPage, DeliveriesPage, CreateDeliveryPage, EditDeliveryPage,
+                 DeliveryForm + card subcomponents, ItemSelectorModal
+                 hooks: useDeliveries, useDelivery, useDeliveryMutations (create/update/
+                 cancel/confirm RPCs), useDeliveryFormData
+                 utils: generateDeliveryPDF.ts
+
+driver/          DriverDeliveriesPage, DriverDeliveryDetailPage, DriverSettingsPage,
+                 SignatureModal, StatusBadge; useDriverDeliveries
+
+inventory/       InventoryPage (items/stock browser), LocationsPage
+                 hooks: useInventoryItems, useInventoryMutations, useItemMovements,
+                 useLocations, useStockLevels
+
+receiving/       ReceivingPage, DailyReceivingLog, NewReceiptModal, ReceiptReview,
+                 ReceiptLineItems/Row, ItemMatchModal, PdfDropZone, CreatePoFromPackingList
+                 hooks: useReceipts, useReceivingMutations (confirm_receipt RPC),
+                 useDailyReceivingLog, useParsePdf, useFolderItems, useProjectItems
+                 utils: generateReceivingLogPDF.ts, actionStyles.ts
+
+purchase-orders/ PurchaseOrdersPage, PoDetailPage, UploadPoModal, PoUploadZone, EditPoModal
+                 hooks: usePurchaseOrders, usePoMutations, useParsePo (calls
+                 parse-purchase-order Edge Function)
+
+projects/        ProjectsPage, ProjectFormModal, ProjectSelector
+                 hooks: useProjects, useProjectMutations (syncs job_site location
+                 from project address)
+
+clients/         ClientsPage, ClientDetailPage, ClientFormModal (general_contractors)
+                 hooks: useClients, useClientMutations
+
+vendors/         VendorsPage, VendorDetailPage, VendorFormModal
+                 hooks: useVendors, useVendorMutations
+
+audit/           AuditPage with tabs: ReconciliationTab, CycleCountsTab, SignedDeliveriesTab
+                 hooks: useReconciliation, useCycleCounts, useCycleCountMutations
+                 (finalize_cycle_count RPC), useSignedDeliveries
+
+activity/        (empty scaffold — backs /activity placeholder route)
+analytics/       (empty scaffold — backs /analytics placeholder route)
+batching/        (empty scaffold — backs /batches placeholder route)
+drivers/         (empty scaffold — no manager-facing driver-admin UI built yet)
+packing-lists/   (empty scaffold — backs /packing-lists placeholder route)
+users/           (empty scaffold — backs /users placeholder route)
 ```
 
-### Services (Business Logic Layer)
-```
-src/services/
-├── sortlyApi.ts                # High-level Sortly operations with caching and deduplication
-│                                # Exports: fetchAllFolders, fetchAllItems, fetchFolderItems,
-│                                #          searchItems, moveItem, copyItem, createItem, createFolder,
-│                                #          updateItem, deleteItem, invalidateCache
-│
-├── cache.ts                    # Generic TTL cache (2-minute default) for API responses
-│                                # Singleton: cacheService — used by sortlyApi.ts
-│
-├── inventoryCache.ts           # Per-folder item cache with TTL — stores items being viewed
-│                                # Singleton: inventoryCache — used by WarehouseInventory page
-│
-├── sortlyPreload.ts            # Warms Sortly caches immediately after login (non-blocking)
-│                                # Called from AuthContext after profile fetch for non-driver roles
-│
-├── deliveryConfirm.ts          # Driver-side delivery operations:
-│                                #   fetchDriverDeliveries (by folder or driver ID)
-│                                #   fetchDeliveryItems, fetchDeliveryConfirmation
-│                                #   uploadSignatureImage (to Supabase storage)
-│
-├── deliveryDelete.ts           # Soft-delete delivery with Sortly rollback
-│                                # If "pending": moves items back from truck to source location,
-│                                # removes delivery notes, then sets deleted_at timestamp
-│
-├── batchRouting.ts             # Delivery batch management:
-│                                #   createBatch, fetchBatches, fetchBatchWithDeliveries
-│                                #   orderDeliveriesByRoute (sorts by zip code)
-│                                #   updateBatchStatus, reassignBatch, deleteBatch
-│
-├── inventoryAdjustment.ts      # Inventory adjustment operations (return, damage, transfer, manual)
-│                                # Creates adjustment record + executes Sortly moves + logs activity
-│
-├── driverAnalytics.ts          # Driver performance metrics:
-│                                #   fetchDriverPerformance (materialized view)
-│                                #   fetchDriverDetailMetrics (computed from delivery data)
-│                                #   fetchDeliveryActivity (chart data grouped by date)
-│                                #   exportDriverMetricsToCSV
-│
-├── notifications.ts            # Delivery notifications via Edge Function
-│                                #   sendDeliveryNotification, fetchUserNotifications
-│                                #   updateNotificationPreferences
-│
-├── photoUpload.ts              # Delivery photo management:
-│                                #   uploadDeliveryPhoto (to Supabase storage + DB record)
-│                                #   fetchDeliveryPhotos, deleteDeliveryPhoto
-│                                #   compressImage (client-side resize before upload)
-│
-└── receivingLog.ts             # Receiving log CRUD:
-                                 #   createReceivingLog, updateReceivingLog, deleteReceivingLog
-                                 #   fetchReceivingLogs (by month), fetchReceivingLogWithEntries
-                                 #   createReceivingLogEntry, attachFileToEntry
-```
-
-### Pages (Route Components)
-```
-src/pages/
-├── Dashboard.tsx               # Main delivery list with stats and filters
-├── DeliveryForm.tsx            # Create/edit delivery — item selection from Sortly + addresses
-├── DeliveryDetail.tsx          # View delivery with items, status, activity log
-├── WarehouseInventory.tsx      # Sortly folder browser with search, create, edit, delete
-├── InventoryAdjustments.tsx    # Record returns, damages, transfers, manual corrections
-├── CreateBatch.tsx             # Group pending deliveries into a driver batch
-├── PackingLists.tsx            # Generate packing lists from batches
-├── ActivityLog.tsx             # Filterable audit trail of all system actions
-├── Vendors.tsx                 # CRUD for vendor contacts and addresses
-├── DriverManagement.tsx        # Admin CRUD for driver accounts (create, reset, delete)
-├── DriverMetrics.tsx           # Charts and tables for driver performance
-├── Settings.tsx                # User profile settings
-├── DriverSettings.tsx          # Driver-specific settings (PIN management)
-├── Login.tsx                   # Manager/admin login form
-├── LoginSelector.tsx           # Landing/login selector (shown when unauthenticated)
-├── DriverLogin.tsx             # Driver login form (username + password or PIN)
-├── DriverDeliveries.tsx        # Driver's assigned delivery list
-├── DriverDeliveryDetail.tsx    # Driver's delivery detail with confirm + signature
-├── ForgotPassword.tsx          # Password reset request
-├── ResetPassword.tsx           # Password reset confirmation
-├── FolderFetcher.tsx           # Dev utility — fetch and display Sortly folder structure
-└── LandingPage.tsx             # Public landing page
-```
-
-### Components
+### Shared Components
 ```
 src/components/
-├── DashboardLayout.tsx         # Shell layout — sidebar (desktop) + bottom nav (mobile)
-├── SidebarNav.tsx              # Desktop sidebar navigation
-├── Deliveries.tsx              # Delivery list component used in Dashboard
-├── ItemSelector.tsx            # Sortly item picker for delivery forms
-├── ItemFormModal.tsx           # Create/edit Sortly item modal
-├── ManualItemModal.tsx         # Add manual (non-Sortly) item to delivery
-├── BatchAssignment.tsx         # Assign deliveries to a batch
-├── AdjustmentForm.tsx          # Form for recording inventory adjustments
-├── ActivityTimeline.tsx        # Visual timeline of delivery/activity events
-├── PhotoCapture.tsx            # Camera component for delivery proof photos
-├── AddressEditor.tsx           # Editable address form component
-├── ReceivingLogModal.tsx       # Modal for logging received inventory
-├── ChangePasswordForm.tsx      # Password change form
-├── PasswordInput.tsx           # Password field with toggle visibility
-├── PasswordStrengthIndicator.tsx # Visual password strength meter
-├── DeleteConfirmDialog.tsx     # Reusable confirmation dialog
-├── DriverStatsCard.tsx         # Summary card for driver performance
-├── SettingsModal.tsx           # Settings modal overlay
-├── PWABadge.tsx                # PWA install/update badge
-│
-├── ui/                         # Reusable UI primitives (design system)
-│   ├── index.ts                # Barrel export
-│   ├── Button.tsx              # Button component with variants
-│   ├── Card.tsx                # Card container component
-│   ├── Badge.tsx               # Status badge component
-│   ├── Modal.tsx               # Modal dialog component
-│   ├── Input.tsx               # Form input component
-│   └── Toast.tsx               # Toast notification provider + component
-│
-├── landing/                    # Landing page sections
-│   ├── Hero.tsx                # Hero section with CTA
-│   ├── Features.tsx            # Feature highlights grid
-│   ├── PortalSelector.tsx      # Manager vs Driver portal cards
-│   ├── Workflow.tsx            # How-it-works workflow steps
-│   ├── Stats.tsx               # Key metrics display
-│   └── Footer.tsx              # Landing page footer
-│
-├── magicui/                    # Visual effect components
-│   ├── cn.ts                   # Class name utility (clsx + twMerge)
-│   ├── dot-pattern.tsx         # Dot grid background pattern
-│   ├── number-ticker.tsx       # Animated number counter
-│   └── retro-grid.tsx          # Retro grid background effect
-│
-└── deliveries/                 # Delivery-specific components
-    ├── CreateDeliveryModal.tsx  # Quick-create delivery modal
-    ├── EditDeliveryModal.tsx    # Quick-edit delivery modal
-    ├── types.ts                # Delivery component type definitions
-    ├── useDeliveries.ts        # Hook for delivery list data fetching
-    └── deliveryPdf.ts          # PDF generation for delivery documents
+├── layout/    # ManagerLayout, Sidebar, Topbar, DriverLayout (see above)
+├── shared/    # ComingSoon.tsx and other cross-feature components
+└── ui/        # Design-system primitives (Icon, etc.)
 ```
 
-### Types (TypeScript Interfaces)
-```
-src/types/
-├── sortly.ts                   # Sortly API types (SortlyItem, SortlyApiResponse, etc.)
-├── delivery.ts                 # Delivery, Project, Truck, DeliveryItem types
-├── address.ts                  # Address interface
-├── activity.ts                 # Activity log types
-├── photo.ts                    # Photo types
-├── receivingLog.ts             # Receiving log and entry types
-├── react-signature-canvas.d.ts # Type declarations for react-signature-canvas
-└── react-date-range.d.ts       # Type declarations for react-date-range
-```
-
-### Utilities (Pure Helper Functions)
-```
-src/utils/
-├── deliveryNumber.ts           # Generate delivery IDs: DEL-YYYYMMDD-XXX
-├── batchNumber.ts              # Generate batch IDs: BAT-YYYYMMDD-XXX
-├── adjustmentNumber.ts         # Generate adjustment IDs: ADJ-YYYYMMDD-XXX
-├── generateSequentialNumber.ts # Shared sequential number generator
-├── generateDeliveryPDF.ts      # jsPDF-based delivery order PDF generation
-├── fetchSortlyFolders.ts       # Utility to fetch Sortly folder tree
-├── sortlyHelpers.ts            # Sortly data transformation helpers
-└── validation.ts               # Input validation functions
-```
-
-### Assets
-```
-src/assets/
-├── WP-warehouse-logo.png       # App logo
-├── Expansive Warehouse Interior.png  # Background image
-├── react.svg                   # Default Vite React logo
-└── lottie/                     # Lottie animation JSON files
-    ├── warehouse.json
-    ├── delivery-truck.json
-    ├── driver.json
-    ├── inventory.json
-    ├── report.json
-    └── checkmark.json
-```
+### Types & Schemas
+Per-feature `types.ts` / `schemas/*Schema.ts` (zod) live inside each feature folder
+(e.g. `deliveries/schemas/deliverySchema.ts`, `receiving/schemas/receivingSchema.ts`).
+Cross-feature shared types live in `src/types/` (e.g. `src/types/project.ts`).
 
 ---
 
@@ -270,62 +165,104 @@ src/assets/
 
 ```
 supabase/functions/
-├── sortly-proxy/               # ★ Central Sortly API gateway — all inventory API calls route here
-│                                # Verifies JWT, forwards requests to Sortly with secret key
-│
-├── sortly-webhook/             # Receives webhooks from Sortly for real-time inventory sync
-│
-├── send-delivery-notification/ # Sends email/push notifications for delivery events
-│
-├── set-driver-pin/             # Sets or updates a driver's 4-digit PIN
-├── verify-driver-pin/          # Validates driver PIN on login
-│
-├── delete-driver/              # Admin operation — deletes a driver account
-├── link-driver-profile/        # Links a new driver auth account to a user profile
+├── parse-purchase-order/       # PDF upload → Claude-based parsing → PO line-item draft for review
+├── parse-packing-list/         # Packing-list PDF → Claude-based parsing for receiving intake
+├── send-delivery-notification/ # Delivery event notifications
+├── set-driver-pin/             # Sets/updates a driver's PIN (service role)
+├── verify-driver-pin/          # Validates PIN on driver login (bcrypt + lockout)
 ├── reset-driver-password/      # Resets a driver's password
-└── update-driver-username/     # Updates a driver's username
+├── update-driver-username/     # Updates a driver's username
+├── link-driver-profile/        # Links a new driver auth account to a users row
+└── delete-driver/              # Deletes a driver account
 ```
+
+All privileged driver-account operations route through these Edge Functions using the
+service role — never directly from the client.
 
 ---
 
-## Data Flow Diagrams
+## Database & Migrations Highlights
+
+Migrations in `supabase/migrations/` are tracked in git (`!supabase/migrations/*.sql`
+gitignore exception). Key milestones, in order:
+
+| Migration | What it did |
+|---|---|
+| `20260212000000` – `20260212000004` | Early delivery/driver-performance/batch scaffolding |
+| `20260325_driver_management_improvements` | Driver account hardening |
+| `20260402000000` / `20260409000000` | Receiving logs + improvements |
+| `20260413000000_create_app_config` | App-wide config table |
+| `20260427000000_receiving_items_and_status` | Per-line receiving items + status |
+| `20260428000000_drop_unused_tables` | Dropped legacy adjustment/batch tables with zero code references |
+| `20260710000000_create_inventory_core` | First-party `locations`, `items`, `stock_levels`, `inventory_movements` — replaces Sortly |
+| `20260710010000_harden_core_rls` | RLS hardening across core + deliveries + activity_log |
+| `20260710020000_clients_vendors_projects` | `general_contractors`, `vendors`, `projects` tables |
+| `20260713000000_purchase_orders` | `purchase_orders` + `po_line_items` + private PDF storage bucket |
+| `20260713010000_receiving_po_rework` | Receiving ↔ PO linkage; `confirm_receipt` RPC |
+| `20260713020000_po_lump_sum` | Lump-sum PO line-item support |
+| `20260713030000_deliveries_cutover` | Deliveries off Sortly onto first-party inventory; `generate_delivery_number()`, `create_delivery`/`update_delivery_items`/`cancel_delivery`/`confirm_delivery` RPCs |
+| `20260713040000_audit_suite` | `po_project_reconciliation` view, cycle counts, `finalize_cycle_count` RPC |
+| `20260714202302_packing_list_storage` | Private `packing-lists` storage bucket + archival column |
+
+All stock-affecting writes go through SECURITY DEFINER RPCs; clients only ever SELECT
+`stock_levels` / `inventory_movements` directly.
+
+---
+
+## Data Flow Notes
+
+### Purchase Order Intake
+```
+Manager uploads PO PDF (UploadPoModal)
+   ↓
+Edge Function parse-purchase-order (Claude parses vendor/line items)
+   ↓
+Draft PO + line items shown for human review (EditPoModal)
+   ↓
+Manager confirms → purchase_orders row (status: draft → confirmed)
+```
+
+### Receiving
+```
+Manager logs a receipt against a PO (NewReceiptModal / ItemMatchModal)
+   ↓
+confirm_receipt RPC (SECURITY DEFINER):
+   - inserts inventory_movements ledger rows
+   - updates stock_levels for the destination location
+   - updates po_line_items received quantity + status
+     (pending → partial → received; over_received allowed & flagged, never blocked)
+```
 
 ### Delivery Lifecycle
 ```
-1. Manager creates delivery (DeliveryForm)
-      ↓
-2. Items copied: Warehouse folder → Truck folder (Sortly copyItem)
-      ↓
-3. Delivery notes added to Sortly items: [Delivery: DEL-YYYYMMDD-XXX]
-      ↓
-4. Driver sees delivery in portal (DriverDeliveries)
-      ↓
-5. Driver starts delivery → status: "in_transit"
-      ↓
-6. Driver confirms with signature (DriverDeliveryDetail)
-      ↓
-7. Items moved: Truck folder → Job Site folder (Sortly moveItem)
-      ↓
-8. Status: "delivered" or "partial" — activity logged
+Manager creates delivery (CreateDeliveryPage / DeliveryForm)
+   ↓
+create_delivery RPC:
+   - generates delivery_number via generate_delivery_number()
+     (format WP-MMDDYY-XX, daily reset, America/New_York)
+   - moves stock from source location → truck location (inventory_movements + stock_levels)
+   ↓
+Driver sees delivery in Driver Portal (DriverDeliveriesPage)
+   ↓
+Driver confirms delivery + captures signature (SignatureModal)
+   ↓
+Signature image uploaded to private delivery-signatures-v2 bucket (storage path saved,
+   viewed via createSignedUrl — never a public URL)
+   ↓
+confirm_delivery RPC moves stock truck → job-site location, updates delivery status
 ```
 
-### Sortly API Call Flow
+### Job Sites
 ```
-Frontend → supabase.functions.invoke("sortly-proxy")
-              ↓
-         Edge Function verifies JWT
-              ↓
-         Forwards to Sortly REST API with SORTLY_SECRET_KEY
-              ↓
-         Returns response to frontend
-              ↓
-         Frontend caches response (2-min TTL)
+Job-site locations are never entered directly by users — a project's address IS its
+job site. useProjectMutations creates/syncs a job_site location whenever a project's
+address changes.
 ```
 
-### Authentication Flow
+### Authentication
 ```
-Manager: Email + Password → Supabase Auth → Profile fetch → Dashboard
-Driver:  Username + Password/PIN → Supabase Auth (or PIN Edge Function) → Profile fetch → Driver Portal
+Manager: email + password → Supabase Auth → profile fetch (useAuth) → ManagerLayout
+Driver:  username + PIN → verify-driver-pin Edge Function (bcrypt + lockout) → DriverLayout
 ```
 
 ---
@@ -334,12 +271,10 @@ Driver:  Username + Password/PIN → Supabase Auth (or PIN Edge Function) → Pr
 
 | Pattern | Where | Why |
 |---|---|---|
-| **Dual Supabase clients** | `lib/supabase.ts` | Prevents admin session hijack when creating driver accounts |
-| **Edge Function proxy** | `sortly-proxy/` | Keeps Sortly API key server-side (security) |
-| **2-layer caching** | `cache.ts` + `inventoryCache.ts` | Reduces Sortly API calls (rate-limited) |
-| **Request deduplication** | `sortlyApi.ts` (inFlight map) | Prevents duplicate concurrent API calls |
-| **Cache preloading** | `sortlyPreload.ts` | Warms caches on login for instant page loads |
-| **Soft deletes** | `deliveries.deleted_at` | Preserves audit trail, enables recovery |
-| **Realtime subscriptions** | `AuthContext.tsx` | Live updates via Supabase Postgres changes |
-| **Role-based routing** | `App.tsx` guards | Separate UX for managers vs drivers |
-| **Activity logging** | Throughout services | Full audit trail of all operations |
+| SECURITY DEFINER RPCs for all stock writes | `move_inventory`, `adjust_inventory`, `confirm_receipt`, `create_delivery`, `update_delivery_items`, `cancel_delivery`, `confirm_delivery`, `finalize_cycle_count` | Keeps the `inventory_movements` ledger append-only and consistent; clients cannot write `stock_levels`/`inventory_movements` directly |
+| Per-feature query key factories | `*Keys.ts` in each feature's `hooks/` | Predictable TanStack Query cache invalidation after mutations |
+| Job site = project address | `projects/hooks/useProjectMutations.ts` | Single source of truth for job-site addresses |
+| Single Supabase client | `lib/supabase.ts` | Privileged ops isolated to Edge Functions (service role) instead of a second client |
+| Private storage + signed URLs | `delivery-signatures-v2`, `purchase-orders`, `packing-lists` buckets | Signatures and vendor/financial documents are never public |
+| Role-based routing | `ManagerRoute` / `DriverRoute` guards in `routes.tsx` | Separate UX for managers vs. drivers |
+| RLS everywhere | Postgres policies + `is_manager()` helper | Managers write, authenticated read, drivers see/update only their own deliveries |

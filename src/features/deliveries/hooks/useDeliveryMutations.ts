@@ -270,14 +270,12 @@ export function useConfirmDelivery() {
 }
 
 // ── Legacy alias kept to avoid breaking DashboardPage / DeliveriesPage ───────
-// These pages pass truckSortlyFolderId which is no longer used; the cancel
-// RPC reads the delivery row itself. We proxy to useCancelDelivery.
+// The cancel RPC reads the delivery row itself. We proxy to useCancelDelivery.
 
 interface DeleteDeliveryParams {
   deliveryId: number
   deliveryNumber?: string
   status?: string
-  truckSortlyFolderId?: number | null
   fromLocationId?: number | null
   activityLog?: ActivityLogEntry[]
   deliveryItems?: Array<{ item_name: string; quantity: number }>

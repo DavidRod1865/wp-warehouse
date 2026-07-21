@@ -73,17 +73,17 @@ export function ClientFormModal({ client, onClose }: ClientFormModalProps) {
     } as ClientFormValues,
   })
 
-  async function onSubmit(values: any) {
+  async function onSubmit(values: ClientFormValues) {
     setSaving(true)
     try {
       if (isEdit && client) {
         await updateClient.mutateAsync({
           id: client.id,
-          values: values as ClientFormValues,
+          values,
         })
         toast('Client updated')
       } else {
-        await createClient.mutateAsync(values as ClientFormValues)
+        await createClient.mutateAsync(values)
         toast('Client created')
       }
       onClose()

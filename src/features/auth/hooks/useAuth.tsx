@@ -69,7 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!user) return null
       const { data, error } = await supabase
         .from('users')
-        .select('id, email, name, username, role, active, driver_sortly_folder_id, force_pin_change')
+        .select('id, email, name, username, role, active, force_pin_change')
         .eq('id', user.id)
         .single()
 

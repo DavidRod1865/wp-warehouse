@@ -13,7 +13,7 @@ interface ClientWithProjects {
   contact_name?: string | null
   phone?: string | null
   email?: string | null
-  billing_address?: any | null
+  billing_address?: { street?: string; city?: string; state?: string; zip?: string; notes?: string } | null
   notes?: string | null
   is_active: boolean
   created_at: string
@@ -164,7 +164,7 @@ export default function ClientDetailPage() {
                 </tr>
               </thead>
               <tbody>
-                {projects.map((project: any) => (
+                {projects.map((project) => (
                   <tr key={project.id} className="border-b border-[var(--line)] hover:bg-[var(--panel-2)]">
                     <td className="px-4 py-3 text-sm text-[var(--ink)]">
                       <Link to={`/projects/${project.id}`} className="text-[var(--signal)] hover:underline">

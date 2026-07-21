@@ -73,17 +73,17 @@ export function VendorFormModal({ vendor, onClose }: VendorFormModalProps) {
     } as VendorFormValues,
   })
 
-  async function onSubmit(values: any) {
+  async function onSubmit(values: VendorFormValues) {
     setSaving(true)
     try {
       if (isEdit && vendor) {
         await updateVendor.mutateAsync({
           id: Number(vendor.id),
-          values: values as VendorFormValues,
+          values,
         })
         toast('Vendor updated', 'success')
       } else {
-        await createVendor.mutateAsync(values as VendorFormValues)
+        await createVendor.mutateAsync(values)
         toast('Vendor created', 'success')
       }
       onClose()

@@ -38,3 +38,6 @@ CLAUDE.md
 .claude/
 .claudeignore
 .playwright-mcp/
+
+# Stray Firebase CLI output (no Firebase usage in this app)
+firebase-debug.log

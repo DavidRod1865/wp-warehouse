@@ -115,7 +115,6 @@ export default function DashboardPage() {
         deliveryId: deliveryToDelete.id,
         deliveryNumber: deliveryToDelete.delivery_number,
         status: deliveryToDelete.status,
-        truckSortlyFolderId: null,
         fromLocationId: null,
         activityLog: deliveryToDelete.activity_log || [],
         deliveryItems: [],

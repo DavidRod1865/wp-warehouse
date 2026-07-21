@@ -77,7 +77,6 @@ export default function DeliveriesPage() {
         deliveryId: deleteTarget.id,
         deliveryNumber: deleteTarget.delivery_number,
         status: deleteTarget.status,
-        truckSortlyFolderId: null,
         fromLocationId: null,
         activityLog: deleteTarget.activity_log || [],
         deliveryItems: [],
@@ -328,7 +327,7 @@ function OrderRow({
       onClick={onEdit}
     >
       <td className="px-5 py-3" style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--ink-2)' }}>
-        #{delivery.delivery_number?.replace('DEL-', '') || delivery.id}
+        #{delivery.delivery_number || delivery.id}
       </td>
       <td className="px-3 py-3">
         <div className="font-medium text-[var(--ink)]">{projectName}</div>

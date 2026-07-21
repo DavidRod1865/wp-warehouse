@@ -82,17 +82,17 @@ export function ProjectFormModal({ project, onClose }: ProjectFormModalProps) {
     } as ProjectFormValues,
   })
 
-  async function onSubmit(values: any) {
+  async function onSubmit(values: ProjectFormValues) {
     setSaving(true)
     try {
       if (isEdit && project) {
         await updateProject.mutateAsync({
           id: project.id,
-          values: values as ProjectFormValues,
+          values,
         })
         toast('Project updated')
       } else {
-        await createProject.mutateAsync(values as ProjectFormValues)
+        await createProject.mutateAsync(values)
         toast('Project created')
       }
       onClose()

@@ -8,5 +8,4 @@ export interface UserProfile {
   role: UserRole
   force_pin_change?: boolean | null
   active: boolean
-  driver_sortly_folder_id?: number | null
 }
